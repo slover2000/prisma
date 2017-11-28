@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/naming"
 )
 
+
 // resolver is the implementaion of grpc.naming.Resolver
 type resolver struct {
 	serviceName string
@@ -29,14 +30,19 @@ func NewResolver(serviceName string) *resolver {
 	return &resolver{serviceName: serviceName}
 }
 
-func (r *resolver) Resolve() (naming.Watcher, error) {
+// @Title resolve the service from etcd, target is the dial address of etcd 
+// @Description create a watcher of etcdv3
+// @Param   key target    string  true    "the etcd address, like http://127.0.0.1:2379,http://127.0.0.1:12379,http://127.0.0.1:22379"
+// @Success return an instance of watcher
+// @Failure return error of etcd3
+func (r *resolver) Resolve(target string, dialTimeout time.Duration) (naming.Watcher, error) {
 	if len(r.serviceName) == 0 {
 		return nil, errors.New("grpclb: no service name provided")
 	}
 
 	client, err := clientv3.New(etcd3.Config{
 		Endpoints:   strings.Split(target, ","),
-		DialTimeout: 5 * time.Second,
+		DialTimeout: timeout,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("grpclb: creat etcd3 client failed: %s", err.Error())
@@ -48,6 +54,7 @@ func (r *resolver) Resolve() (naming.Watcher, error) {
 
 // Close do nothing
 func (w *watcher) Close() {
+
 }
 
 // Next to return the updates

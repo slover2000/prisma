@@ -1,0 +1,12 @@
+package: 51nap.com/prisma
+import:
+- package: github.com/coreos/etcd
+  version: ^3.2.10
+  subpackages:
+  - clientv3
+  - etcdserver/api/v3rpc/rpctypes
+  - mvcc/mvccpb
+- package: google.golang.org/grpc
+  version: ^1.8.0
+  subpackages:
+  - naming
