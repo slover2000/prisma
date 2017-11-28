@@ -7,7 +7,7 @@ const Prefix = "gprc-service"
 const DefaultGroup = "DEFAULT_GROUP"
 
 // DefaultWeight is default weight of endpoint
-const DefaultWeight = 1
+const DefaultWeight = 5
 
 type EnvironmentType = int
 // iota 初始化后会自动递增

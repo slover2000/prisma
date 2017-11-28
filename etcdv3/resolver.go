@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"encoding/json"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/mvcc/mvccpb"
@@ -16,18 +17,24 @@ import (
 // resolver is the implementaion of grpc.naming.Resolver
 type resolver struct {
 	serviceName string
+	groupName	string
 }
 
 // watcher is the implementaion of grpc.naming.Watcher
 type watcher struct {
-	resolver      resolver
-	client        *etcd3.Client
+	resolver      *resolver
+	client        *clientv3.Client
 	isInitialized bool
 }
 
 // NewResolver return resolver with service name
 func NewResolver(serviceName string) *resolver {
 	return &resolver{serviceName: serviceName}
+}
+
+// NewResolver return resolver with service name
+func NewResolverWithGroup(serviceName, groupName string) *resolver {
+	return &resolver{serviceName: serviceName, groupName: groupName}
 }
 
 // @Title resolve the service from etcd, target is the dial address of etcd 
@@ -40,14 +47,14 @@ func (r *resolver) Resolve(target string, dialTimeout time.Duration) (naming.Wat
 		return nil, errors.New("grpclb: no service name provided")
 	}
 
-	client, err := clientv3.New(etcd3.Config{
+	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   strings.Split(target, ","),
-		DialTimeout: timeout,
+		DialTimeout: dialTimeout,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("grpclb: creat etcd3 client failed: %s", err.Error())
 	}
-	defer cli.Close()
+	defer client.Close()
 
 	return &watcher{resolver: r, client: client}, nil
 }
@@ -60,26 +67,27 @@ func (w *watcher) Close() {
 // Next to return the updates
 func (w *watcher) Next() ([]*naming.Update, error) {
 	// prefix is the etcd prefix/value to watch
-	prefix := fmt.Sprintf("/%s/%s/", Prefix, w.re.serviceName)
+	prefix := fmt.Sprintf("/%s/%s/", Prefix, w.resolver.serviceName)
 	// check if is initialized
 	if !w.isInitialized {
 		// query addresses from etcd
-		resp, err := w.client.Get(context.Background(), prefix, etcd3.WithPrefix())
+		resp, err := w.client.Get(context.Background(), prefix, clientv3.WithPrefix())
 		w.isInitialized = true
 		if err == nil {
-			addrs := extractAddrs(resp)
+			addrs := extractAddrs(resp, w.resolver.groupName)
 			//if not empty, return the updates or watcher new dir
 			if l := len(addrs); l != 0 {
 				updates := make([]*naming.Update, l)
-				for i := range addrs {
-					updates[i] = &naming.Update{Op: naming.Add, Addr: addrs[i]}
+				for i, ep := range addrs {
+					addr := fmt.Sprintf("%s:%d", ep.Host, ep.Port)
+					updates[i] = &naming.Update{Op: naming.Add, Addr: addr}
 				}
 				return updates, nil
 			}
 		}
 	}
 	// generate etcd Watcher
-	rch := w.client.Watch(context.Background(), prefix, etcd3.WithPrefix())
+	rch := w.client.Watch(context.Background(), prefix, clientv3.WithPrefix())
 	for wresp := range rch {
 		for _, ev := range wresp.Events {
 			switch ev.Type {
@@ -92,14 +100,21 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 	}
 	return nil, nil
 }
-func extractAddrs(resp *etcd3.GetResponse) []string {
-	addrs := []string{}
+
+func extractAddrs(resp *clientv3.GetResponse, group string) []Endpoint {
+	addrs := make([]Endpoint, 0)
 	if resp == nil || resp.Kvs == nil {
 		return addrs
 	}
+
 	for i := range resp.Kvs {
 		if v := resp.Kvs[i].Value; v != nil {
-			addrs = append(addrs, string(v))
+			ep := &Endpoint{}
+			json.Unmarshal(v, ep)
+			if len(group) > 0 && group != ep.Group {
+				continue
+			}
+			addrs = append(addrs, *ep)
 		}
 	}
 	return addrs
