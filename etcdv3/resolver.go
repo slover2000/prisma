@@ -73,9 +73,7 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 	// check if is initialized
 	if !w.isInitialized {
 		// query addresses from etcd
-		ctx, cancel := context.WithTimeout(context.Background(), w.resolver.dialTimeout)
-		resp, err := w.client.Get(ctx, prefix, clientv3.WithPrefix())
-		cancel()
+		resp, err := w.client.Get(context.Background(), prefix, clientv3.WithPrefix())
 		if err == nil {
 			w.isInitialized = true
 			addrs := extractAddrs(resp, w.resolver.groupName)
