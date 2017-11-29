@@ -66,20 +66,19 @@ func RegisterWithEtcd(serviceName string, target string, ep Endpoint, interval, 
         }
 
         // invoke self-refresh with ticker
-        ticker := time.NewTicker(interval)        
-        for {
-            // refresh set to true for not notifying the watcher
-            ctx, cancel := context.WithTimeout(context.Background(), DefaultRequestTimeout * time.Second)
-            _, err = client.KeepAliveOnce(ctx, leaseID)
-            cancel()
-            if err != nil {
-                log.Printf("grpclb: refresh service '%s' with ttl to etcd3 failed: %s", serviceName, err.Error())
-            }            
-
+        ticker := time.NewTicker(interval)
+        for {    
             select {
             case <-stopSignal:
                 return
             case <-ticker.C:
+                // refresh set to true for not notifying the watcher
+                ctx, cancel := context.WithTimeout(context.Background(), DefaultRequestTimeout * time.Second)
+                _, err = client.KeepAliveOnce(ctx, leaseID)
+                cancel()
+                if err != nil {
+                    log.Printf("grpclb: refresh service '%s' with ttl to etcd3 failed: %s", serviceName, err.Error())
+                }
             }
         }
     }()
