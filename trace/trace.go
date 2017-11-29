@@ -360,7 +360,7 @@ func (t *trace) finish(s *Span, wait bool, opts ...FinishOption) error {
 }
 
 func (t *trace) constructTrace() {
-	for i, sp := range t.spans {
+	for _, sp := range t.spans {
 		if sp.host != "" {
 			sp.SetLabel(LabelHTTPHost, sp.host)
 		}
