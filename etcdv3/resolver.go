@@ -56,14 +56,13 @@ func (r *etcdResolver) Resolve(target string) (naming.Watcher, error) {
 	if err != nil {
 		return nil, fmt.Errorf("grpclb: creat etcd3 client failed: %s", err.Error())
 	}
-	defer client.Close()
 
 	return &watcher{resolver: r, client: client}, nil
 }
 
-// Close do nothing
+// Close close etcd v3 client
 func (w *watcher) Close() {
-
+	w.client.Close()
 }
 
 // Next to return the updates
