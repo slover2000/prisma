@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	
 	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 )
 
 var stopSignal = make(chan bool, 1)
@@ -57,22 +56,15 @@ func Register(serviceName string, target string, ep Endpoint, interval, ttl time
         for {
             // minimum lease TTL is ttl-second
             resp, _ := client.Grant(context.TODO(), int64(ttl.Seconds()))
-            // should get first, if not exist, set it
-            _, err := client.Get(context.Background(), serviceKey)
+
+            // refresh set to true for not notifying the watcher
+            ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+            _, err := client.Put(ctx, serviceKey, string(endpointValue), clientv3.WithLease(resp.ID))
+            cancel()
             if err != nil {
-                if err == rpctypes.ErrKeyNotFound {
-                    if _, err := client.Put(context.TODO(), serviceKey, string(endpointValue), clientv3.WithLease(resp.ID)); err != nil {
-                        log.Printf("grpclb: set service '%s' with ttl to etcd3 failed: %s", serviceName, err.Error())
-                    }
-                } else {
-                    log.Printf("grpclb: service '%s' connect to etcd3 failed: %s", serviceName, err.Error())
-                }
-            } else {
-                // refresh set to true for not notifying the watcher
-                if _, err := client.Put(context.Background(), serviceKey, string(endpointValue), clientv3.WithLease(resp.ID)); err != nil {
-                    log.Printf("grpclb: refresh service '%s' with ttl to etcd3 failed: %s", serviceName, err.Error())
-                }
-            }
+                log.Printf("grpclb: refresh service '%s' with ttl to etcd3 failed: %s", serviceName, err.Error())
+            }            
+
             select {
             case <-stopSignal:
                 return
@@ -88,11 +80,14 @@ func Register(serviceName string, target string, ep Endpoint, interval, ttl time
 func UnRegister() error {
     stopSignal <- true
     close(stopSignal)
-    var err error;
-    if _, err := client.Delete(context.Background(), serviceKey); err != nil {
+    defer client.Close()
+
+    var err error
+    if _, err = client.Delete(context.Background(), serviceKey); err != nil {
         log.Printf("grpclb: deregister '%s' failed: %s", serviceKey, err.Error())
     } else {
         log.Printf("grpclb: deregister '%s' ok.", serviceKey)
     }
+    
     return err
 }
