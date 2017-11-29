@@ -15,26 +15,27 @@ import (
 
 
 // resolver is the implementaion of grpc.naming.Resolver
-type resolver struct {
+type etcdResolver struct {
 	serviceName string
 	groupName	string
+	dialTimeout time.Duration
 }
 
 // watcher is the implementaion of grpc.naming.Watcher
 type watcher struct {
-	resolver      *resolver
+	resolver      *etcdResolver
 	client        *clientv3.Client
 	isInitialized bool
 }
 
 // NewResolver return resolver with service name
-func NewResolver(serviceName string) *resolver {
-	return &resolver{serviceName: serviceName}
+func NewResolver(serviceName string, timeout time.Duration) *etcdResolver {
+	return &etcdResolver{serviceName: serviceName, dialTimeout: timeout}
 }
 
 // NewResolver return resolver with service name
-func NewResolverWithGroup(serviceName, groupName string) *resolver {
-	return &resolver{serviceName: serviceName, groupName: groupName}
+func NewResolverWithGroup(serviceName, groupName string, timeout time.Duration) *etcdResolver {
+	return &etcdResolver{serviceName: serviceName, groupName: groupName, dialTimeout: timeout}
 }
 
 // @Title resolve the service from etcd, target is the dial address of etcd 
@@ -42,14 +43,14 @@ func NewResolverWithGroup(serviceName, groupName string) *resolver {
 // @Param   key target    string  true    "the etcd address, like http://127.0.0.1:2379,http://127.0.0.1:12379,http://127.0.0.1:22379"
 // @Success return an instance of watcher
 // @Failure return error of etcd3
-func (r *resolver) Resolve(target string, dialTimeout time.Duration) (naming.Watcher, error) {
+func (r *etcdResolver) Resolve(target string) (naming.Watcher, error) {
 	if len(r.serviceName) == 0 {
 		return nil, errors.New("grpclb: no service name provided")
 	}
 
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   strings.Split(target, ","),
-		DialTimeout: dialTimeout,
+		DialTimeout: r.dialTimeout,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("grpclb: creat etcd3 client failed: %s", err.Error())
