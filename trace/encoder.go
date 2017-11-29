@@ -82,7 +82,7 @@ const (
 	JSONEncoderType TraceEncoderType = iota
 )
 
-func NewTraceEncoder(t EncoderType) TraceEncoder {
+func NewTraceEncoder(t TraceEncoderType) TraceEncoder {
 	switch t {
 	case  JSONEncoderType:
 		return &JSONEncoder{}
