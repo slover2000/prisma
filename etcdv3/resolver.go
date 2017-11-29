@@ -72,9 +72,9 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 	// check if is initialized
 	if !w.isInitialized {
 		// query addresses from etcd
-		resp, err := w.client.Get(context.Background(), prefix, clientv3.WithPrefix())
-		w.isInitialized = true
+		resp, err := w.client.Get(context.Background(), prefix, clientv3.WithPrefix())		
 		if err == nil {
+			w.isInitialized = true
 			addrs := extractAddrs(resp, w.resolver.groupName)
 			//if not empty, return the updates or watcher new dir
 			if l := len(addrs); l != 0 {
