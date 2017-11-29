@@ -51,15 +51,26 @@ func RegisterWithEtcd(serviceName string, target string, ep Endpoint, interval, 
     }
 
 	go func() {
-        // invoke self-register with ticker
-        ticker := time.NewTicker(interval)
+        // delete any previous existent service node
+        client.Delete(context.Background(), serviceKey)
+
+        // minimum lease TTL is ttl-second
+        resp, _ := client.Grant(context.TODO(), int64(ttl.Seconds()))
+        leaseID := resp.ID
+        ctx, cancel := context.WithTimeout(context.Background(), DefaultRequestTimeout * time.Second)
+        _, err = client.Put(ctx, serviceKey, string(endpointValue), clientv3.WithLease(leaseID))
+        cancel()
+        if err != nil {
+            log.Fatalf("grpclb: register service '%s' with ttl to etcd3 failed: %s", serviceName, err.Error())
+            return
+        }
+
+        // invoke self-refresh with ticker
+        ticker := time.NewTicker(interval)        
         for {
-            // minimum lease TTL is ttl-second
-            resp, _ := client.Grant(context.TODO(), int64(ttl.Seconds()))
-            
             // refresh set to true for not notifying the watcher
             ctx, cancel := context.WithTimeout(context.Background(), DefaultRequestTimeout * time.Second)
-            _, err := client.Put(ctx, serviceKey, string(endpointValue), clientv3.WithLease(resp.ID))
+            _, err = client.KeepAliveOnce(ctx, leaseID)
             cancel()
             if err != nil {
                 log.Printf("grpclb: refresh service '%s' with ttl to etcd3 failed: %s", serviceName, err.Error())
