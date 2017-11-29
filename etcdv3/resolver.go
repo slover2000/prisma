@@ -1,6 +1,7 @@
 package etcdv3
 
 import (
+	"log"
 	"context"
 	"errors"
 	"fmt"
@@ -85,6 +86,8 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 				}
 				return updates, nil
 			}
+		} else {
+			log.Printf("grpclb: get key with prefix[%s] failed:%s", prefix, err.Error())
 		}
 	}
 	// generate etcd Watcher
