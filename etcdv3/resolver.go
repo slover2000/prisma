@@ -90,6 +90,7 @@ func (w *watcher) Next() ([]*naming.Update, error) {
 			}
 		} else {
 			log.Printf("grpclb: get key with prefix[%s] failed:%s", prefix, err.Error())
+			return nil, err
 		}
 	}
 	// generate etcd Watcher

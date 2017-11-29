@@ -58,7 +58,7 @@ func Register(serviceName string, target string, ep Endpoint, interval, ttl time
             resp, _ := client.Grant(context.TODO(), int64(ttl.Seconds()))
 
             // refresh set to true for not notifying the watcher
-            ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+            ctx, cancel := context.WithTimeout(context.Background(), DefaultOpTimeout * time.Second)
             _, err := client.Put(ctx, serviceKey, string(endpointValue), clientv3.WithLease(resp.ID))
             cancel()
             if err != nil {
