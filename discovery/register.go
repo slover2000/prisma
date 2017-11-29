@@ -1,4 +1,4 @@
-package etcdv3
+package discovery
 
 import (
 	"fmt"
@@ -27,7 +27,7 @@ func initEndpointWithDefault(ep *Endpoint) {
 }
 
 // Register register a service into etcdv3
-func Register(serviceName string, target string, ep Endpoint, interval, ttl time.Duration) error {
+func RegisterWithEtcd(serviceName string, target string, ep Endpoint, interval, ttl time.Duration) error {
     if len(ep.Host) == 0 {
         return errors.New("endpoint must have a host.")
     }
@@ -56,9 +56,9 @@ func Register(serviceName string, target string, ep Endpoint, interval, ttl time
         for {
             // minimum lease TTL is ttl-second
             resp, _ := client.Grant(context.TODO(), int64(ttl.Seconds()))
-
+            
             // refresh set to true for not notifying the watcher
-            ctx, cancel := context.WithTimeout(context.Background(), DefaultOpTimeout * time.Second)
+            ctx, cancel := context.WithTimeout(context.Background(), DefaultRequestTimeout * time.Second)
             _, err := client.Put(ctx, serviceKey, string(endpointValue), clientv3.WithLease(resp.ID))
             cancel()
             if err != nil {
@@ -77,7 +77,7 @@ func Register(serviceName string, target string, ep Endpoint, interval, ttl time
 }
 
 // UnRegister delete registered service from etcd
-func UnRegister() error {
+func UnRegisterWithEtcd() error {
     stopSignal <- true
     close(stopSignal)
     defer client.Close()

@@ -1,4 +1,4 @@
-package etcdv3
+package discovery
 
 import (
 	"log"
@@ -22,20 +22,20 @@ type etcdResolver struct {
 	dialTimeout time.Duration
 }
 
-// watcher is the implementaion of grpc.naming.Watcher
-type watcher struct {
+// etcdWatcher is the implementaion of grpc.naming.Watcher
+type etcdWatcher struct {
 	resolver      *etcdResolver
 	client        *clientv3.Client
 	isInitialized bool
 }
 
 // NewResolver return resolver with service name
-func NewResolver(serviceName string, timeout time.Duration) *etcdResolver {
+func NewEtcdResolver(serviceName string, timeout time.Duration) *etcdResolver {
 	return &etcdResolver{serviceName: serviceName, dialTimeout: timeout}
 }
 
 // NewResolver return resolver with service name
-func NewResolverWithGroup(serviceName, groupName string, timeout time.Duration) *etcdResolver {
+func NewEtcdResolverWithGroup(serviceName, groupName string, timeout time.Duration) *etcdResolver {
 	return &etcdResolver{serviceName: serviceName, groupName: groupName, dialTimeout: timeout}
 }
 
@@ -57,16 +57,16 @@ func (r *etcdResolver) Resolve(target string) (naming.Watcher, error) {
 		return nil, fmt.Errorf("grpclb: creat etcd3 client failed: %s", err.Error())
 	}
 
-	return &watcher{resolver: r, client: client}, nil
+	return &etcdWatcher{resolver: r, client: client}, nil
 }
 
 // Close close etcd v3 client
-func (w *watcher) Close() {
+func (w *etcdWatcher) Close() {
 	w.client.Close()
 }
 
 // Next to return the updates
-func (w *watcher) Next() ([]*naming.Update, error) {
+func (w *etcdWatcher) Next() ([]*naming.Update, error) {
 	// prefix is the etcd prefix/value to watch
 	prefix := fmt.Sprintf("/%s/%s/", Prefix, w.resolver.serviceName)
 	// check if is initialized

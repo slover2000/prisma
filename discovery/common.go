@@ -1,4 +1,4 @@
-package etcdv3
+package discovery
 
 // Prefix is leading path of gprc service
 const Prefix = "gprc-service"
@@ -10,7 +10,7 @@ const DefaultGroup = "DEFAULT_GROUP"
 const DefaultWeight = 5
 
 // DefaultOpTimeout is default timeout for each etcd operation in seconds
-const DefaultOpTimeout = 5
+const DefaultRequestTimeout = 5
 
 type EnvironmentType = int
 // iota 初始化后会自动递增
