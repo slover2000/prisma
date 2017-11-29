@@ -1,6 +1,9 @@
 package trace
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"encoding/json"
+)
 
 const (
 	versionID    = 0
@@ -65,4 +68,72 @@ func DecodeTrace(src []byte) (traceID []byte, spanID uint64, opts byte, ok bool)
 		}
 	}
 	return traceID, spanID, opts, true
+}
+
+// TraceEncoder encode span data
+type TraceEncoder interface {
+	Encode(t *trace) []byte
+}
+
+type TraceEncoderType int
+
+const (
+	// JSONEncoderType type of trace encoders
+	JSONEncoderType TraceEncoderType = iota
+)
+
+func NewTraceEncoder(t EncoderType) TraceEncoder {
+	switch t {
+	case  JSONEncoderType:
+		return &JSONEncoder{}
+	default:
+		return nil
+	}
+}
+
+type (
+// JSONEncoder encoder for json format
+ 	JSONEncoder struct {
+	
+	}
+	
+	JSONTraceData struct {
+		ProjectID 	string 	`json:project`
+		TraceID 	string	`json:trace`
+		Spans		[]JSONSpanData `json:spans`
+	}
+	
+	JSONSpanData struct {
+		StartTime	int64	`json:starttime`
+		EndTime 	int64	`json:endtime`
+		Name 		string 	`json:name`
+		Kind 		string 	`json:kind`
+		SpanID 		uint64	`spanid`
+		ParentID	uint64	`parentid`
+		Labels		map[string]string	`labels`
+	}
+)
+
+func (r *JSONEncoder) Encode(t *trace) []byte {
+	data := JSONTraceData{
+		ProjectID: t.client.projectID,
+		TraceID: t.traceID,
+		Spans: make([]JSONSpanData, len(t.spans)),
+	}
+
+	for i := range t.spans {
+		s := t.spans[i]
+		data.Spans[i] = JSONSpanData{
+			StartTime: s.start.Unix(),
+			EndTime: s.end.Unix(),
+			Name: s.name,
+			Kind: s.kind,
+			SpanID: s.spanID,
+			ParentID: s.parentSpanID,
+			Labels: s.labels,
+		}
+	}
+
+	result, _ := json.Marshal(data)
+	return result
 }

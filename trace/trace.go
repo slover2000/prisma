@@ -85,14 +85,16 @@ func nextTraceID() string {
 type Client struct {
 	projectID 	string
 	policy    	SamplingPolicy
+	recorder	TraceRecorder
+
 }
 
 // NewClient creates a new Google Stackdriver Trace client.
 func NewClient(ctx context.Context, projectID string) (*Client, error) {
-	policy, _ := NewLimitedSampler(defaultSampleRate, defaultMaxQPS)
+	defaultPolicy, _ := NewLimitedSampler(defaultSampleRate, defaultMaxQPS)
 	c := &Client{
 		projectID: projectID,
-		policy: policy,
+		policy: defaultPolicy,
 	}
 	return c, nil
 }
@@ -102,6 +104,13 @@ func NewClient(ctx context.Context, projectID string) (*Client, error) {
 func (c *Client) SetSamplingPolicy(p SamplingPolicy) {
 	if c != nil {
 		c.policy = p
+	}
+}
+
+// SetRecorder sets the recorder of the trace
+func (c *Client) SetRecorder(r TraceRecorder) {
+	if c != nil {
+		c.recorder = r
 	}
 }
 
@@ -264,7 +273,6 @@ func FromContext(ctx context.Context) *Span {
 }
 
 func traceInfoFromHeader(h string) (traceID string, spanID uint64, options optionFlags, optionsOk bool, ok bool) {
-	// See https://cloud.google.com/trace/docs/faq for the header format.
 	// Return if the header is empty or missing, or if the header is unreasonably
 	// large, to avoid making unnecessary copies of a large string.
 	if h == "" || len(h) > 200 {
@@ -330,56 +338,42 @@ func (t *trace) finish(s *Span, wait bool, opts ...FinishOption) error {
 	}
 	s.end = time.Now()
 	t.mu.Lock()
+	if t.spans == nil {
+		t.spans = make([]*Span, 0)
+	}
 	t.spans = append(t.spans, s)
-	spans := t.spans
 	t.mu.Unlock()
 	if s.rootSpan {
+		t.constructTrace()
 		if wait {
-			//return t.client.upload([]*api.Trace{t.constructTrace(spans)})
+			if t.client.recorder != nil {
+				t.client.recorder.Record(t)
+			}
 		}
 		go func() {
-			t.constructTrace(spans)
-			// err := t.client.bundler.Add(tr, 1+len(spans))
-			// if err == bundler.ErrOversizedItem {
-			// 	err = t.client.upload([]*api.Trace{tr})
-			// }
-			// if err != nil {
-			// 	log.Println("error uploading trace:", err)
-			// }
+			if t.client.recorder != nil {
+				t.client.recorder.Record(t)
+			}
 		}()
 	}
 	return nil
 }
 
-func (t *trace) constructTrace(spans []*Span) string {
-	// apiSpans := make([]*api.TraceSpan, len(spans))
-	// for i, sp := range spans {
-	// 	sp.span.StartTime = sp.start.In(time.UTC).Format(time.RFC3339Nano)
-	// 	sp.span.EndTime = sp.end.In(time.UTC).Format(time.RFC3339Nano)
-	// 	if t.localOptions&optionStack != 0 {
-	// 		sp.setStackLabel()
-	// 	}
-	// 	if sp.host != "" {
-	// 		sp.SetLabel(LabelHTTPHost, sp.host)
-	// 	}
-	// 	if sp.url != "" {
-	// 		sp.SetLabel(LabelHTTPURL, sp.url)
-	// 	}
-	// 	if sp.method != "" {
-	// 		sp.SetLabel(LabelHTTPMethod, sp.method)
-	// 	}
-	// 	if sp.statusCode != 0 {
-	// 		sp.SetLabel(LabelHTTPStatusCode, strconv.Itoa(sp.statusCode))
-	// 	}
-	// 	apiSpans[i] = &sp.span
-	// }
-
-	// return &api.Trace{
-	// 	ProjectId: t.client.projectID,
-	// 	TraceId:   t.traceID,
-	// 	Spans:     apiSpans,
-	// }
-	return ""
+func (t *trace) constructTrace() {
+	for i, sp := range t.spans {
+		if sp.host != "" {
+			sp.SetLabel(LabelHTTPHost, sp.host)
+		}
+		if sp.url != "" {
+			sp.SetLabel(LabelHTTPURL, sp.url)
+		}
+		if sp.method != "" {
+			sp.SetLabel(LabelHTTPMethod, sp.method)
+		}
+		if sp.statusCode != 0 {
+			sp.SetLabel(LabelHTTPStatusCode, strconv.Itoa(sp.statusCode))
+		}
+	}
 }
 
 // Span contains information about one span of a trace.
@@ -576,6 +570,5 @@ func (u withResponse) modifySpan(s *Span) {
 }
 
 func spanHeader(traceID string, spanID uint64, options optionFlags) string {
-	// See https://cloud.google.com/trace/docs/faq for the header format.
 	return fmt.Sprintf("%s/%d;o=%d", traceID, spanID, options)
 }
