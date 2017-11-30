@@ -40,3 +40,23 @@ func (r *LogCollector) Close() error {
 func NewLogCollector() Collector {
 	return &LogCollector{encoder: NewTraceEncoder(JSONEncoderType)}
 }
+
+// MultiCollector implements Collector by sending spans to all collectors.
+type MultiCollector []Collector
+
+// Collect implements Collector.
+func (c MultiCollector) Collect(s *Span) error {
+	return c.aggregateErrors(func(coll Collector) error { return coll.Collect(s) })
+}
+
+// Close implements Collector.
+func (c MultiCollector) Close() error {
+	return c.aggregateErrors(func(coll Collector) error { return coll.Close() })
+}
+
+func (c MultiCollector) aggregateErrors(f func(Collector) error) error {
+	for _, collector := range c {
+		f(collector)
+	}
+	return nil
+}
