@@ -76,7 +76,7 @@ func HTTPClient(client *http.Client) HTTPOption {
 // url for handle post request, the url like "http://ip:port/api/v1/spans". timeout is passed to http client. queueSize control
 // the maximum size of buffer of async queue. The logger is used to log errors,
 // such as send failures;
-func NewHTTPCollector(url string, options ...HTTPOption) (trace.Collector, error) {
+func NewHTTPCollector(url string, options ...HTTPOption) trace.Collector {
 	c := &HTTPCollector{
 		url:           url,
 		client:        &http.Client{Timeout: defaultHTTPTimeout},
@@ -96,7 +96,7 @@ func NewHTTPCollector(url string, options ...HTTPOption) (trace.Collector, error
 	}
 
 	go c.loop()
-	return c, nil
+	return c
 }
 
 // Collect implements Collector.
