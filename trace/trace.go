@@ -85,7 +85,7 @@ func nextTraceID() string {
 type Client struct {
 	projectID 	string
 	policy    	SamplingPolicy
-	collector	TraceCollector
+	collector	Collector
 
 }
 
@@ -109,7 +109,7 @@ func (c *Client) SetSamplingPolicy(p SamplingPolicy) {
 }
 
 // SetRecorder sets the recorder of the trace
-func (c *Client) SetCollector(t TraceCollector) {
+func (c *Client) SetCollector(t Collector) {
 	if c != nil {
 		// close previous collector
 		c.collector.Close()
@@ -153,7 +153,6 @@ func (c *Client) SpanFromHeader(name string, header string) *Span {
 	}
 	span := startNewChild(name, t, parentSpanID)
 	span.kind = spanKindServer
-	span.rootSpan = true
 	configureSpanFromPolicy(span, c.policy, ok)
 	return span
 }
@@ -178,7 +177,6 @@ func (c *Client) SpanFromContext(name string, header string) *Span {
 	}
 	span := startNewChild(name, t, parentSpanID)
 	span.kind = spanKindServer
-	span.rootSpan = true
 	configureSpanFromPolicy(span, c.policy, ok)
 	return span
 }
@@ -215,7 +213,6 @@ func (c *Client) SpanFromRequest(r *http.Request) *Span {
 	}
 	span := startNewChildWithRequest(r, t, parentSpanID)
 	span.kind = spanKindServer
-	span.rootSpan = true
 	configureSpanFromPolicy(span, c.policy, ok)
 	return span
 }
@@ -237,7 +234,6 @@ func (c *Client) NewSpan(name string) *Span {
 	}
 	span := startNewChild(name, t, 0)
 	span.kind = spanKindUnspecified
-	span.rootSpan = true
 	configureSpanFromPolicy(span, c.policy, false)
 	return span
 }
@@ -332,49 +328,17 @@ type trace struct {
 	traceID       string
 	globalOptions optionFlags // options that will be passed to any child requests
 	localOptions  optionFlags // options applied in this server
-	spans         []*Span     // finished spans for this trace.
 }
 
 // finish appends s to t.spans.  If s is the root span, uploads the trace to the
 // server.
-func (t *trace) finish(s *Span, wait bool, opts ...FinishOption) error {
+func (t *trace) finish(s *Span, opts ...FinishOption) error {
 	for _, o := range opts {
 		o.modifySpan(s)
 	}
 	s.end = time.Now()
-	t.mu.Lock()
-	if t.spans == nil {
-		t.spans = make([]*Span, 0)
-	}
-	t.spans = append(t.spans, s)
-	t.mu.Unlock()
-	if s.rootSpan {
-		t.constructTrace()
-		if wait {
-			t.client.collector.Collect(t)
-		}
-		go func() {
-			t.client.collector.Collect(t)
-		}()
-	}
-	return nil
-}
-
-func (t *trace) constructTrace() {
-	for _, sp := range t.spans {
-		if sp.host != "" {
-			sp.SetLabel(LabelHTTPHost, sp.host)
-		}
-		if sp.url != "" {
-			sp.SetLabel(LabelHTTPURL, sp.url)
-		}
-		if sp.method != "" {
-			sp.SetLabel(LabelHTTPMethod, sp.method)
-		}
-		if sp.statusCode != 0 {
-			sp.SetLabel(LabelHTTPStatusCode, strconv.Itoa(sp.statusCode))
-		}
-	}
+	s.construct()
+	return t.client.collector.Collect(s)
 }
 
 // Span contains information about one span of a trace.
@@ -388,8 +352,7 @@ type Span struct {
 	parentSpanID   	uint64
 
 	start      time.Time
-	end        time.Time
-	rootSpan   bool
+	end        time.Time	
 	host       string
 	method     string
 	url        string
@@ -486,6 +449,15 @@ func (s *Span) TraceID() string {
 	return s.trace.traceID
 }
 
+
+// ProjectID returns the ID of the project to which s belongs.
+func (s *Span) ProjectID() string {
+	if s == nil {
+		return ""
+	}
+	return s.trace.client.projectID
+}
+
 // SetLabel sets the label for the given key to the given value.
 // If the value is empty, the label for that key is deleted.
 // If a label is given a value automatically and by SetLabel, the
@@ -500,9 +472,13 @@ func (s *Span) SetLabel(key, value string) {
 	if !s.Traced() {
 		return
 	}
+
 	s.spanMu.Lock()
 	defer s.spanMu.Unlock()
+	s.setLabelWithoutLock(key, value)
+}
 
+func (s *Span) setLabelWithoutLock(key, value string) {
 	if value == "" {
 		if s.labels != nil {
 			delete(s.labels, key)
@@ -513,6 +489,28 @@ func (s *Span) SetLabel(key, value string) {
 		s.labels = make(map[string]string)
 	}
 	s.labels[key] = value
+}
+
+func (s *Span) construct() {
+	if s == nil {
+		return
+	}
+
+	s.spanMu.Lock()
+	defer s.spanMu.Unlock()
+
+	if s.host != "" {
+		s.setLabelWithoutLock(LabelHTTPHost, s.host)
+	}
+	if s.url != "" {
+		s.setLabelWithoutLock(LabelHTTPURL, s.url)
+	}
+	if s.method != "" {
+		s.setLabelWithoutLock(LabelHTTPMethod, s.method)
+	}
+	if s.statusCode != 0 {
+		s.setLabelWithoutLock(LabelHTTPStatusCode, strconv.Itoa(s.statusCode))
+	}
 }
 
 // Finish declares that the span has finished.
@@ -534,19 +532,7 @@ func (s *Span) Finish(opts ...FinishOption) {
 	if !s.Traced() {
 		return
 	}
-	s.trace.finish(s, false, opts...)
-}
-
-// FinishWait is like Finish, but if s is a root span, it waits until uploading
-// is finished, then returns an error if one occurred.
-func (s *Span) FinishWait(opts ...FinishOption) error {
-	if s == nil {
-		return nil
-	}
-	if !s.Traced() {
-		return nil
-	}
-	return s.trace.finish(s, true, opts...)
+	s.trace.finish(s, opts...)
 }
 
 // FinishOption ...

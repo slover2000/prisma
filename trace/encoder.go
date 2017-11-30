@@ -72,7 +72,7 @@ func unpackTrace(src []byte) (traceID []byte, spanID uint64, opts byte, ok bool)
 
 // TraceEncoder encode span data
 type TraceEncoder interface {
-	Encode(t *trace) []byte
+	Encode(*Span) []byte
 }
 
 type TraceEncoderType int
@@ -100,7 +100,7 @@ type (
 	JSONTraceData struct {
 		ProjectID 	string 	`json:project`
 		TraceID 	string	`json:trace`
-		Spans		[]JSONSpanData `json:spans`
+		Span		JSONSpanData `json:span`
 	}
 	
 	JSONSpanData struct {
@@ -114,16 +114,11 @@ type (
 	}
 )
 
-func (r *JSONEncoder) Encode(t *trace) []byte {
+func (r *JSONEncoder) Encode(s *Span) []byte {
 	data := JSONTraceData{
-		ProjectID: t.client.projectID,
-		TraceID: t.traceID,
-		Spans: make([]JSONSpanData, len(t.spans)),
-	}
-
-	for i := range t.spans {
-		s := t.spans[i]
-		data.Spans[i] = JSONSpanData{
+		ProjectID: s.trace.client.projectID,
+		TraceID: s.TraceID(),
+		Span: JSONSpanData{
 			StartTime: s.start.Unix(),
 			EndTime: s.end.Unix(),
 			Name: s.name,
@@ -131,9 +126,8 @@ func (r *JSONEncoder) Encode(t *trace) []byte {
 			SpanID: s.spanID,
 			ParentID: s.parentSpanID,
 			Labels: s.labels,
-		}
+		},
 	}
-
 	result, _ := json.Marshal(data)
 	return result
 }
