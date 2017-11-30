@@ -15,10 +15,11 @@ import (
 )
 
 const (
+	SpanKindClient      = `RPC_CLIENT`
+	SpanKindServer      = `RPC_SERVER`
+	SpanKindUnspecified = `SPAN_KIND_UNSPECIFIED`
+	
 	httpTraceHeader 	= `x-trace-ctx`
-	spanKindClient      = `RPC_CLIENT`
-	spanKindServer      = `RPC_SERVER`
-	spanKindUnspecified = `SPAN_KIND_UNSPECIFIED`
 	defaultSampleRate	= 1e-4
 	defaultMaxQPS		= 10
 )
@@ -152,7 +153,7 @@ func (c *Client) SpanFromHeader(name string, header string) *Span {
 		localOptions:  options,
 	}
 	span := startNewChild(name, t, parentSpanID)
-	span.kind = spanKindServer
+	span.kind = SpanKindServer
 	configureSpanFromPolicy(span, c.policy, ok)
 	return span
 }
@@ -176,7 +177,7 @@ func (c *Client) SpanFromContext(name string, header string) *Span {
 		localOptions:  uint32(uint8(opts)),
 	}
 	span := startNewChild(name, t, parentSpanID)
-	span.kind = spanKindServer
+	span.kind = SpanKindServer
 	configureSpanFromPolicy(span, c.policy, ok)
 	return span
 }
@@ -212,7 +213,7 @@ func (c *Client) SpanFromRequest(r *http.Request) *Span {
 		localOptions:  options,
 	}
 	span := startNewChildWithRequest(r, t, parentSpanID)
-	span.kind = spanKindServer
+	span.kind = SpanKindServer
 	configureSpanFromPolicy(span, c.policy, ok)
 	return span
 }
@@ -233,7 +234,7 @@ func (c *Client) NewSpan(name string) *Span {
 		globalOptions: optionTrace,
 	}
 	span := startNewChild(name, t, 0)
-	span.kind = spanKindUnspecified
+	span.kind = SpanKindUnspecified
 	configureSpanFromPolicy(span, c.policy, false)
 	return span
 }
@@ -430,7 +431,7 @@ func startNewChild(name string, trace *trace, parentSpanID uint64) *Span {
 	newSpan := &Span{
 		trace: trace,
 		name: name,
-		kind: spanKindClient,
+		kind: SpanKindClient,
 		parentSpanID: parentSpanID,
 		spanID: spanID,
 		start: time.Now(),
@@ -456,6 +457,50 @@ func (s *Span) ProjectID() string {
 		return ""
 	}
 	return s.trace.client.projectID
+}
+
+func (s *Span) Name() string {
+	if s == nil {
+		return ""
+	}
+	return s.name
+}
+
+func (s *Span) Kind() string {
+	if s == nil {
+		return ""
+	}
+	return s.kind	
+}
+
+func (s *Span) SpanID() uint64 {
+	if s == nil {
+		return 0
+	}
+	return s.spanID
+}
+
+func (s *Span) ParentSpanID() uint64 {
+	if s == nil {
+		return 0
+	}
+	return s.parentSpanID
+}
+
+func (s *Span) Labels() map[string]string {
+	if s == nil {
+		return nil
+	}
+
+	return s.labels
+}
+
+func (s *Span) Start() time.Time {
+	return s.start
+}
+
+func (s *Span) End() time.Time {
+	return s.end
 }
 
 // SetLabel sets the label for the given key to the given value.

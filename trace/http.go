@@ -73,7 +73,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		localOptions:  options,
 	}
 	span := startNewChildWithRequest(r, t, parentSpanID)
-	span.kind = spanKindServer
+	span.kind = SpanKindServer
 	configureSpanFromPolicy(span, h.traceClient.policy, ok)
 	defer span.Finish()
 

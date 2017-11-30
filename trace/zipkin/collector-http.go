@@ -73,7 +73,7 @@ func HTTPClient(client *http.Client) HTTPOption {
 }
 
 // NewHTTPCollector returns a new HTTP-backend Collector. url should be a http
-// url for handle post request. timeout is passed to http client. queueSize control
+// url for handle post request, the url like "http://ip:port/api/v1/spans". timeout is passed to http client. queueSize control
 // the maximum size of buffer of async queue. The logger is used to log errors,
 // such as send failures;
 func NewHTTPCollector(url string, options ...HTTPOption) (trace.Collector, error) {
@@ -99,15 +99,15 @@ func NewHTTPCollector(url string, options ...HTTPOption) (trace.Collector, error
 	return c, nil
 }
 
-func convertToZipkinSpan(spans *trace.Span) *zipkincore.Span {
-	zipkinSpan := &zipkincore.Span{
-
-	}
-}
-
 // Collect implements Collector.
 func (c *HTTPCollector) Collect(s *trace.Span) error {
-	c.spanc <- convertToZipkinSpan(s)
+	ss, err := ConvertToZipkinSpan(s)
+	if err != nil {
+		log.Printf("convert span to zipkin format failed:%s", err.Error())
+		return err
+	}
+
+	c.spanc <- ss
 	return nil
 }
 
