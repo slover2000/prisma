@@ -19,10 +19,10 @@ const (
 	traceContextLen = 1 + 1 + traceIDLen + 1 + spanIDLen + 1 + optsLen
 )
 
-// EncodeTrace encodes trace ID, span ID and options into dst. The number of bytes
+// packTrace encodes trace ID, span ID and options into dst. The number of bytes
 // written will be returned. If len(dst) isn't big enough to fit the trace context,
 // a negative number is returned.
-func EncodeTrace(dst []byte, traceID []byte, spanID uint64, opts byte) (n int) {
+func packTrace(dst []byte, traceID []byte, spanID uint64, opts byte) (n int) {
 	if len(dst) < traceContextLen {
 		return -1
 	}
@@ -43,9 +43,9 @@ func EncodeTrace(dst []byte, traceID []byte, spanID uint64, opts byte) (n int) {
 	return offset
 }
 
-// DecodeTrace decodes the src into a trace ID, span ID and options. If src doesn't
+// unpackTrace decodes the src into a trace ID, span ID and options. If src doesn't
 // contain a valid trace context, ok = false is returned.
-func DecodeTrace(src []byte) (traceID []byte, spanID uint64, opts byte, ok bool) {
+func unpackTrace(src []byte) (traceID []byte, spanID uint64, opts byte, ok bool) {
 	if len(src) < traceContextLen {
 		return traceID, spanID, 0, false
 	}

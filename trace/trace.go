@@ -85,7 +85,7 @@ func nextTraceID() string {
 type Client struct {
 	projectID 	string
 	policy    	SamplingPolicy
-	recorder	TraceRecorder
+	collector	TraceCollector
 
 }
 
@@ -95,6 +95,7 @@ func NewClient(ctx context.Context, projectID string) (*Client, error) {
 	c := &Client{
 		projectID: projectID,
 		policy: defaultPolicy,
+		collector: NewNopCollector(),
 	}
 	return c, nil
 }
@@ -108,9 +109,12 @@ func (c *Client) SetSamplingPolicy(p SamplingPolicy) {
 }
 
 // SetRecorder sets the recorder of the trace
-func (c *Client) SetRecorder(r TraceRecorder) {
+func (c *Client) SetCollector(t TraceCollector) {
 	if c != nil {
-		c.recorder = r
+		// close previous collector
+		c.collector.Close()
+		// assign a new collector
+		c.collector = t
 	}
 }
 
@@ -154,6 +158,31 @@ func (c *Client) SpanFromHeader(name string, header string) *Span {
 	return span
 }
 
+func (c *Client) SpanFromContext(name string, header string) *Span {
+	if c == nil {
+		return nil
+	}
+	traceIDBytes, parentSpanID, opts, ok := unpackTrace([]byte(header))
+	var traceID string
+	if !ok {
+		traceID = nextTraceID()
+	} else {
+		traceID = fmt.Sprintf("%x", traceIDBytes)
+	}
+	
+	t := &trace{
+		traceID:       traceID,
+		client:        c,
+		globalOptions: uint32(uint8(opts)),
+		localOptions:  uint32(uint8(opts)),
+	}
+	span := startNewChild(name, t, parentSpanID)
+	span.kind = spanKindServer
+	span.rootSpan = true
+	configureSpanFromPolicy(span, c.policy, ok)
+	return span
+}
+
 // SpanFromRequest returns a new trace span for an HTTP request or nil
 // if the client is nil.
 //
@@ -185,30 +214,6 @@ func (c *Client) SpanFromRequest(r *http.Request) *Span {
 		localOptions:  options,
 	}
 	span := startNewChildWithRequest(r, t, parentSpanID)
-	span.kind = spanKindServer
-	span.rootSpan = true
-	configureSpanFromPolicy(span, c.policy, ok)
-	return span
-}
-
-// SpanFromMetadata returns a new trace span from a metadata or nil
-// if the client is nil.
-//
-func (c *Client) SpanFromMetadata(name string, header string) *Span {
-	if c == nil {
-		return nil
-	}
-	traceID, parentSpanID, options, _, ok := traceInfoFromHeader(header)
-	if !ok {
-		traceID = nextTraceID()
-	}
-	t := &trace{
-		traceID:       traceID,
-		client:        c,
-		globalOptions: options,
-		localOptions:  options,
-	}
-	span := startNewChild(name, t, parentSpanID)
 	span.kind = spanKindServer
 	span.rootSpan = true
 	configureSpanFromPolicy(span, c.policy, ok)
@@ -314,7 +319,7 @@ func traceInfoFromHeader(h string) (traceID string, spanID uint64, options optio
 	return traceID, spanID, options, true, true
 }
 
-type optionFlags uint32
+type optionFlags = uint32
 
 const (
 	optionTrace optionFlags = 1 << iota
@@ -346,14 +351,10 @@ func (t *trace) finish(s *Span, wait bool, opts ...FinishOption) error {
 	if s.rootSpan {
 		t.constructTrace()
 		if wait {
-			if t.client.recorder != nil {
-				t.client.recorder.Record(t)
-			}
+			t.client.collector.Collect(t)
 		}
 		go func() {
-			if t.client.recorder != nil {
-				t.client.recorder.Record(t)
-			}
+			t.client.collector.Collect(t)
 		}()
 	}
 	return nil

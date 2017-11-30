@@ -44,7 +44,7 @@ func (c *Client) grpcUnaryInterceptor(ctx context.Context, method string, req, r
 	}
 
 	traceContext := make([]byte, traceContextLen)
-	EncodeTrace(traceContext, tid, span.spanID, byte(span.trace.globalOptions))
+	packTrace(traceContext, tid, span.spanID, byte(span.trace.globalOptions))
 	md, ok := metadata.FromOutgoingContext(ctx)
 	if !ok {
 		md = metadata.Pairs(grpcMetadataKey, string(traceContext))
@@ -80,7 +80,7 @@ func (c *Client) GRPCServerInterceptor() grpc.UnaryServerInterceptor {
 		md, _ := metadata.FromIncomingContext(ctx)
 		var traceHeader string
 		if header, ok := md[grpcMetadataKey]; ok {
-			traceID, spanID, opts, ok := DecodeTrace([]byte(header[0]))
+			traceID, spanID, opts, ok := unpackTrace([]byte(header[0]))
 			if ok {
 				// TODO(jbd): Generate a span directly from string(traceID), spanID and opts.
 				traceHeader = fmt.Sprintf("%x/%d;o=%d", traceID, spanID, opts)
