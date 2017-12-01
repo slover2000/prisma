@@ -11,10 +11,6 @@ import (
 	"github.com/slover2000/prisma/trace/zipkin/thrift-gen/zipkincore"
 )
 
-func unixMicrosecond(t time.Time) int64 {
-	return t.UnixNano() / int64(time.Microsecond)
-}
-
 // ConvertToZipkinSpan converts a span to zipkin format span
 func ConvertToZipkinSpan(s *trace.Span) (*zipkincore.Span, error) {
 	tid, err := hex.DecodeString(s.TraceID())

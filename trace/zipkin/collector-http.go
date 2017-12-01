@@ -33,7 +33,7 @@ type HTTPCollector struct {
 	batchSize     int
 	maxBacklog    int
 	batch         []*zipkincore.Span
-	spanc         chan *zipkincore.Span
+	spanc         chan *trace.Span
 	quit          chan struct{}
 	shutdown      chan error
 	sendMutex     *sync.Mutex
@@ -84,7 +84,7 @@ func NewHTTPCollector(url string, options ...HTTPOption) trace.Collector {
 		batchSize:     defaultHTTPBatchSize,
 		maxBacklog:    defaultHTTPMaxBacklog,
 		batch:         []*zipkincore.Span{},
-		spanc:         make(chan *zipkincore.Span),
+		spanc:         make(chan *trace.Span),
 		quit:          make(chan struct{}, 1),
 		shutdown:      make(chan error, 1),
 		sendMutex:     &sync.Mutex{},
@@ -101,13 +101,7 @@ func NewHTTPCollector(url string, options ...HTTPOption) trace.Collector {
 
 // Collect implements Collector.
 func (c *HTTPCollector) Collect(s *trace.Span) error {
-	ss, err := ConvertToZipkinSpan(s)
-	if err != nil {
-		log.Printf("convert span to zipkin format failed:%s", err.Error())
-		return err
-	}
-
-	c.spanc <- ss
+	c.spanc <- s
 	return nil
 }
 
@@ -148,10 +142,15 @@ func (c *HTTPCollector) loop() {
 	for {
 		select {
 		case span := <-c.spanc:
-			currentBatchSize := c.append(span)
-			if currentBatchSize >= c.batchSize {
-				nextSend = time.Now().Add(c.batchInterval)
-				go c.send()
+			zpSpan, err := ConvertToZipkinSpan(span)
+			if err == nil {
+				currentBatchSize := c.append(zpSpan)
+				if currentBatchSize >= c.batchSize {
+					nextSend = time.Now().Add(c.batchInterval)
+					go c.send()
+				}
+			} else {
+				log.Printf("convert span to zipkin format failed:%s", err.Error())
 			}
 		case <-tickc:
 			if time.Now().After(nextSend) {
