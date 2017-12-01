@@ -95,11 +95,13 @@ func (w *etcdWatcher) Next() ([]*naming.Update, error) {
 	rch := w.client.Watch(context.Background(), prefix, clientv3.WithPrefix())
 	for wresp := range rch {
 		for _, ev := range wresp.Events {
+			ep := decodeEndpointFromEvent(ev)
+			addr := fmt.Sprintf("%s:%d", ep.Host, ep.Port)
 			switch ev.Type {
 			case mvccpb.PUT:
-				return []*naming.Update{{Op: naming.Add, Addr: string(ev.Kv.Value)}}, nil
+				return []*naming.Update{{Op: naming.Add, Addr: addr}}, nil
 			case mvccpb.DELETE:
-				return []*naming.Update{{Op: naming.Delete, Addr: string(ev.Kv.Value)}}, nil
+				return []*naming.Update{{Op: naming.Delete, Addr: addr}}, nil
 			}
 		}
 	}
@@ -123,4 +125,10 @@ func extractAddrs(resp *clientv3.GetResponse, group string) []Endpoint {
 		}
 	}
 	return addrs
+}
+
+func decodeEndpointFromEvent(ev *clientv3.Event) *Endpoint {
+	ep := &Endpoint{}
+	json.Unmarshal(ev.Kv.Value, ep)
+	return ep
 }
