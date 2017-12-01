@@ -513,8 +513,16 @@ func (s *Span) Start() time.Time {
 	return s.start
 }
 
+func (s *Span) StartTime(unit time.Duration) int64 {
+	return s.start.UnixNano() / int64(unit)
+}
+
 func (s *Span) End() time.Time {
 	return s.end
+}
+
+func (s *Span) EndTime(unit time.Duration) int64 {
+	return s.end.UnixNano() / int64(unit)
 }
 
 // SetLabel sets the label for the given key to the given value.

@@ -120,8 +120,8 @@ func (r *JSONEncoder) Encode(s *Span) []byte {
 		ProjectID: s.trace.client.projectID,
 		TraceID: s.TraceID(),
 		Span: JSONSpanData{
-			StartTime: s.start.UnixNano() / int64(time.Microsecond),
-			EndTime: s.end.UnixNano() / int64(time.Microsecond),
+			StartTime: s.StartTime(time.Microsecond),
+			EndTime: s.EndTime(time.Microsecond),
 			Name: s.name,
 			Kind: s.kind,
 			SpanID: s.spanID,
