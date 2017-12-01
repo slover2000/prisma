@@ -42,11 +42,8 @@ func (c *Client) grpcUnaryInterceptor(ctx context.Context, method string, req, r
 		span.SetLabel(LabelError, err.Error())
 	}
 
-	// log unary client grpc
-	if c.logOptions.entry != nil {
-		logGrpcClientLine(c.logOptions, outgoingCtx, method, span.Start(), err, fmt.Sprintf("finished client call %s.", method))
-	}
-
+	// log unary client grpc	
+	logGrpcClientLine(c.logOptions, outgoingCtx, method, span.Start(), err, fmt.Sprintf("finished client call %s.", method))
 	return err
 }
 
@@ -192,9 +189,7 @@ func (c *Client) GRPCUnaryServerInterceptor() grpc.UnaryServerInterceptor {
 		resp, err = handler(ctx, req)
 
 		// log unary server grpc
-		if c.logOptions.entry != nil {
-			logGrpcClientLine(c.logOptions, ctx, info.FullMethod, span.Start(), err, fmt.Sprintf("finished service %s.", info.FullMethod))
-		}
+		logGrpcClientLine(c.logOptions, ctx, info.FullMethod, span.Start(), err, fmt.Sprintf("finished service %s.", info.FullMethod))
 		return
 	}
 }
@@ -242,9 +237,7 @@ func (c *Client) GRPStreamServerInterceptor() grpc.StreamServerInterceptor {
 		err := handler(srv, stream)
 
 		// log stream server grpc
-		if c.logOptions.entry != nil {
-			logGrpcClientLine(c.logOptions, ctx, info.FullMethod, span.Start(), err, fmt.Sprintf("finished service %s.", info.FullMethod))
-		}		
+		logGrpcClientLine(c.logOptions, ctx, info.FullMethod, span.Start(), err, fmt.Sprintf("finished service %s.", info.FullMethod))
 		return err
 	}
 }

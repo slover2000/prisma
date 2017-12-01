@@ -26,27 +26,26 @@ const (
 
 // Stackdriver Trace API predefined labels.
 const (
-	LabelAgent              = `trace/agent`
-	LabelComponent          = `trace/component`
-	LabelErrorMessage       = `trace/error/message`
-	LabelErrorName          = `trace/error/name`
-	LabelHTTPClientCity     = `trace/http/client_city`
-	LabelHTTPClientCountry  = `trace/http/client_country`
-	LabelHTTPClientProtocol = `trace/http/client_protocol`
-	LabelHTTPClientRegion   = `trace/http/client_region`
-	LabelHTTPHost           = `trace/http/host`
-	LabelHTTPMethod         = `trace/http/method`
-	LabelHTTPRedirectedURL  = `trace/http/redirected_url`
-	LabelHTTPRequestSize    = `trace/http/request/size`
-	LabelHTTPResponseSize   = `trace/http/response/size`
-	LabelHTTPStatusCode     = `trace/http/status_code`
-	LabelHTTPURL            = `trace/http/url`
-	LabelHTTPUserAgent      = `trace/http/user_agent`
-	LabelPID                = `trace/pid`
-	LabelSamplingPolicy     = `trace/sampling_policy`
-	LabelSamplingWeight     = `trace/sampling_weight`
-	LabelStackTrace         = `trace/stacktrace`
-	LabelTID                = `trace/tid`
+	LabelAgent              = `agent`
+	LabelComponent          = `component`
+	LabelHTTPClientCity     = `http.client_city`
+	LabelHTTPClientCountry  = `http.client_country`
+	LabelHTTPClientProtocol = `http.client_protocol`
+	LabelHTTPClientRegion   = `http.client_region`
+	LabelHTTPHost           = `http.host`
+	LabelHTTPMethod         = `http.method`
+	LabelHTTPRedirectedURL  = `http.redirected_url`
+	LabelHTTPRequestSize    = `http.request.size`
+	LabelHTTPResponseSize   = `http.response.size`
+	LabelHTTPStatusCode     = `http.status_code`
+	LabelHTTPURL            = `http.url`
+	LabelHTTPUserAgent      = `http.user_agent`
+	LabelHTTPDuration      	= `http.duration`
+	LabelPID                = `pid`
+	LabelSamplingPolicy     = `sampling_policy`
+	LabelSamplingWeight     = `sampling_weight`
+	LabelStackTrace         = `stacktrace`
+	LabelTID                = `tid`
 	LabelError 				= "error"
 )
 

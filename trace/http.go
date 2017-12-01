@@ -1,6 +1,7 @@
 package trace
 
 import (
+	"fmt"
 	"net/http"
 )
 
@@ -8,7 +9,8 @@ import (
 //
 // Transport is safe for concurrent usage.
 type Transport struct {
-	Base http.RoundTripper
+	client 	*Client
+	Base 	http.RoundTripper
 }
 
 // RoundTrip creates a trace.Span and inserts it into the outgoing request's headers.
@@ -21,6 +23,15 @@ func (t Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// TODO(jbd): Is it possible to defer the span.Finish?
 	// In cases where RoundTrip panics, we still can finish the span.
 	span.Finish(WithResponse(resp))
+
+	// log http request
+	if t.client != nil {
+		statusCode := 500
+		if resp != nil {
+			statusCode = resp.StatusCode
+		}		
+		logHttpClientLine(t.client.logOptions, req, span.Start(), statusCode, fmt.Sprintf("%s finished.", req.URL.String()))
+	}
 	return resp, err
 }
 

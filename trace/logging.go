@@ -3,6 +3,8 @@ package trace
 import (
 	"time"
 	"path"
+	"strconv"
+	"net/http"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -54,7 +56,7 @@ func grpcErrorToCode(err error) codes.Code {
 }
 
 func logGrpcClientLine(options *loggingOptions, ctx context.Context, fullMethodString string, startTime time.Time, err error, msg string) {
-	if options.entry == nil {
+	if options == nil || options.entry == nil {
 		return
 	}
 
@@ -75,6 +77,23 @@ func logGrpcClientLine(options *loggingOptions, ctx context.Context, fullMethodS
 	logMessageWithLevel(options.entry.WithFields(fields), level, msg)
 }
 
+func logHttpClientLine(options *loggingOptions, req *http.Request, startTime time.Time, code int, msg string) {
+	if options == nil || options.entry == nil {
+		return
+	}
+
+	level := httpCodeToLogrusLevel(code)
+	if level < loglevelToLogusLevel(options.level) {
+		return
+	}
+
+	durVal := time.Now().Sub(startTime)	
+	fields := newHttpClientLoggerFields(req)
+	fields[LabelHTTPStatusCode] = strconv.Itoa(code)
+	fields[LabelHTTPDuration] = durVal
+	logMessageWithLevel(options.entry.WithFields(fields), level, msg)
+}
+
 func newGrpcClientLoggerFields(ctx context.Context, fullMethodString string) logrus.Fields {
 	service := path.Dir(fullMethodString)[1:]
 	method := path.Base(fullMethodString)
@@ -83,6 +102,17 @@ func newGrpcClientLoggerFields(ctx context.Context, fullMethodString string) log
 		KindField:      	SpanKindClient,
 		GRPCServiceField: 	service,
 		GRPCMethodField:  	method,
+	}
+}
+
+func newHttpClientLoggerFields(req *http.Request) logrus.Fields {
+	url := req.URL.String()
+	method := req.Method
+	return logrus.Fields{
+		SystemField:    "http",
+		KindField:      SpanKindClient,
+		LabelHTTPURL: 	url,
+		LabelHTTPMethod:method,
 	}
 }
 
@@ -157,5 +187,15 @@ func grpcCodeToLogrusLevel(code codes.Code) logrus.Level {
 		return logrus.ErrorLevel
 	default:
 		return logrus.ErrorLevel
+	}
+}
+
+func httpCodeToLogrusLevel(status int) logrus.Level {
+	if status > 200 {
+		return logrus.ErrorLevel
+	} else if status >= 200 && status <= 299 {
+		return logrus.InfoLevel
+	} else {
+		return logrus.WarnLevel
 	}
 }
