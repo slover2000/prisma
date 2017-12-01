@@ -18,8 +18,8 @@ func ConvertToZipkinSpan(s *trace.Span) (*zipkincore.Span, error) {
 		return nil, err
 	}
 
-	high := int64(binary.LittleEndian.Uint64(tid[:8]))
-	low := int64(binary.LittleEndian.Uint64(tid[8:]))
+	low := int64(binary.BigEndian.Uint64(tid[8:]))
+	high := int64(binary.BigEndian.Uint64(tid[:8]))	
 	var parentID *int64
 	if s.ParentSpanID() > 0 {
 		parent := int64(s.ParentSpanID())
@@ -118,7 +118,7 @@ func ConvertToZipkinSpan(s *trace.Span) (*zipkincore.Span, error) {
 		case trace.LabelHTTPStatusCode:
 			target = zipkincore.HTTP_STATUS_CODE
 		case trace.LabelError:
-			target = zipkincore.ERROR		
+			target = zipkincore.ERROR
 		}
 		binAnn := &zipkincore.BinaryAnnotation{
 			Key: target,
