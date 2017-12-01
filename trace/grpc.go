@@ -32,7 +32,7 @@ func (c *Client) grpcUnaryInterceptor(ctx context.Context, method string, req, r
 	// TODO: also intercept streams.
 	span := FromContext(ctx).NewChild(method)
 	if span == nil {
-		span = c.NewSpan(method)
+		span = c.NewClientKindSpan(method)
 	}
 	defer span.Finish()
 	
@@ -60,7 +60,7 @@ func (c *Client) GRPCStreamClientInterceptor() grpc.StreamClientInterceptor {
 	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
 		span := FromContext(ctx).NewChild(method)
 		if span == nil {
-			span = c.NewSpan(method)
+			span = c.NewClientKindSpan(method)
 		}
 
 		outgoingCtx, err := buildClientOutgoingContext(ctx, span)

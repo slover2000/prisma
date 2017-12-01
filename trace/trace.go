@@ -224,6 +224,19 @@ func (c *Client) SpanFromRequest(r *http.Request) *Span {
 // A new trace and span ID is generated to trace the span.
 // Returned span need to be finished by calling Finish or FinishWait.
 func (c *Client) NewSpan(name string) *Span {
+	return c.newSpan(name, SpanKindUnspecified)
+}
+
+// NewClientKindSpan returns a new trace span with the given name or nil if the
+// client is nil.
+//
+// A new trace and span ID is generated to trace the span.
+// Returned span need to be finished by calling Finish or FinishWait.
+func (c *Client) NewClientKindSpan(name string) *Span {
+	return c.newSpan(name, SpanKindClient)
+}
+
+func (c *Client) newSpan(name, kind string) *Span {
 	if c == nil {
 		return nil
 	}
@@ -234,7 +247,7 @@ func (c *Client) NewSpan(name string) *Span {
 		globalOptions: optionTrace,
 	}
 	span := startNewChild(name, t, 0)
-	span.kind = SpanKindUnspecified
+	span.kind = kind
 	configureSpanFromPolicy(span, c.policy, false)
 	return span
 }
