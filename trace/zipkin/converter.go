@@ -1,7 +1,6 @@
 package zipkin
 
 import (
-	"fmt"
 	"time"
 	"errors"
 	"encoding/hex"
