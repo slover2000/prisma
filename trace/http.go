@@ -9,7 +9,7 @@ import (
 //
 // Transport is safe for concurrent usage.
 type Transport struct {
-	client 	*Client
+	Client 	*Client
 	Base 	http.RoundTripper
 }
 
@@ -25,12 +25,12 @@ func (t Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	span.Finish(WithResponse(resp))
 
 	// log http request
-	if t.client != nil {
+	if t.Client != nil {
 		statusCode := 500
 		if resp != nil {
 			statusCode = resp.StatusCode
 		}		
-		logHttpClientLine(t.client.logOptions, req, span.Start(), statusCode, fmt.Sprintf("%s finished.", req.URL.String()))
+		logHttpClientLine(t.Client.logOptions, req, span.Start(), statusCode, fmt.Sprintf("%s finished.", req.URL.String()))
 	}
 	return resp, err
 }
