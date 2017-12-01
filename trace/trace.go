@@ -88,7 +88,7 @@ type Client struct {
 	projectID 	string
 	policy    	SamplingPolicy
 	collector	Collector
-
+	logOptions	*loggingOptions
 }
 
 // NewClient creates a new Google Stackdriver Trace client.
@@ -98,6 +98,7 @@ func NewClient(ctx context.Context, projectID string) (*Client, error) {
 		projectID: projectID,
 		policy: defaultPolicy,
 		collector: NewNopCollector(),
+		logOptions: defaultLoggingOptions,
 	}
 	return c, nil
 }
@@ -117,6 +118,12 @@ func (c *Client) SetCollector(t Collector) {
 		c.collector.Close()
 		// assign a new collector
 		c.collector = t
+	}
+}
+
+func (c *Client) ConfigLogger(options ...LoggingOption) {
+	for _, option := range options {
+		option(c.logOptions)
 	}
 }
 
@@ -471,6 +478,13 @@ func (s *Span) ProjectID() string {
 		return ""
 	}
 	return s.trace.client.projectID
+}
+
+func (s *Span) Client() *Client {
+	if s == nil {
+		return nil
+	}
+	return s.trace.client
 }
 
 func (s *Span) Name() string {

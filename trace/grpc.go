@@ -1,6 +1,7 @@
 package trace
 
 import (
+	"fmt"
 	"io"
 	"sync"
 	"encoding/hex"
@@ -29,22 +30,23 @@ func (c *Client) GRPCUnaryClientInterceptor() grpc.UnaryClientInterceptor {
 }
 
 func (c *Client) grpcUnaryInterceptor(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-	// TODO: also intercept streams.
 	span := FromContext(ctx).NewChild(method)
 	if span == nil {
 		span = c.NewClientKindSpan(method)
 	}
 	defer span.Finish()
 	
-	outgoingCtx, err := buildClientOutgoingContext(ctx, span)
+	outgoingCtx := buildClientOutgoingContext(ctx, span)
+	err := invoker(outgoingCtx, method, req, reply, cc, opts...)
 	if err != nil {
-		return invoker(ctx, method, req, reply, cc, opts...)
-	}
-
-	err = invoker(outgoingCtx, method, req, reply, cc, opts...)
-	if err != nil {		
 		span.SetLabel(LabelError, err.Error())
 	}
+
+	// log unary client grpc
+	if c.logOptions.entry != nil {
+		logGrpcClientLine(c.logOptions, outgoingCtx, method, span.Start(), err, fmt.Sprintf("finished client call %s.", method))
+	}
+
 	return err
 }
 
@@ -62,28 +64,23 @@ func (c *Client) GRPCStreamClientInterceptor() grpc.StreamClientInterceptor {
 			span = c.NewClientKindSpan(method)
 		}
 
-		outgoingCtx, err := buildClientOutgoingContext(ctx, span)
-		if err != nil {
-			return streamer(ctx, desc, cc, method, opts...)
-		}
-
+		outgoingCtx := buildClientOutgoingContext(ctx, span)
 		clientStream, err := streamer(outgoingCtx, desc, cc, method, opts...)
-		if err != nil {			
-			span.SetLabel(LabelError, err.Error())
-			finishClientSpan(span, err)
+		if err != nil {		
+			finishClientSpan(span, outgoingCtx, err)
 			return nil, err
 		}
 		return &tracedClientStream{ClientStream: clientStream, clientSpan: span}, nil
 	}
 }
 
-func buildClientOutgoingContext(parentCtx context.Context, span *Span) (context.Context, error) {
+func buildClientOutgoingContext(parentCtx context.Context, span *Span) context.Context {
 	// traceID is a hex-encoded 128-bit value.
 	// TODO(jbd): Decode trace IDs upon arrival and
 	// represent trace IDs with 16 bytes internally.
 	tid, err := hex.DecodeString(span.trace.traceID)
 	if err != nil {
-		return nil, err		
+		return parentCtx		
 	}
 
 	traceContext := make([]byte, traceContextLen)
@@ -97,7 +94,7 @@ func buildClientOutgoingContext(parentCtx context.Context, span *Span) (context.
 	}
 	ctx := metadata.NewOutgoingContext(parentCtx, md)
 
-	return ctx, nil
+	return ctx
 }
 
 // type serverStreamingRetryingStream is the implementation of grpc.ClientStream that acts as a
@@ -113,7 +110,7 @@ type tracedClientStream struct {
 func (s *tracedClientStream) Header() (metadata.MD, error) {
 	h, err := s.ClientStream.Header()
 	if err != nil {
-		s.finishClientSpan(err)
+		s.finishClientSpan(s.Context(), err)
 	}
 	return h, err
 }
@@ -121,7 +118,7 @@ func (s *tracedClientStream) Header() (metadata.MD, error) {
 func (s *tracedClientStream) SendMsg(m interface{}) error {
 	err := s.ClientStream.SendMsg(m)
 	if err != nil {
-		s.finishClientSpan(err)
+		s.finishClientSpan(s.Context(), err)
 	}
 	return err
 }
@@ -129,7 +126,7 @@ func (s *tracedClientStream) SendMsg(m interface{}) error {
 func (s *tracedClientStream) CloseSend() error {
 	err := s.ClientStream.CloseSend()
 	if err != nil {
-		s.finishClientSpan(err)
+		s.finishClientSpan(s.Context(), err)
 	}
 	return err
 }
@@ -137,23 +134,34 @@ func (s *tracedClientStream) CloseSend() error {
 func (s *tracedClientStream) RecvMsg(m interface{}) error {
 	err := s.ClientStream.RecvMsg(m)
 	if err != nil {
-		s.finishClientSpan(err)
+		s.finishClientSpan(s.Context(), err)
 	}
 	return err
 }
 
-func (s *tracedClientStream) finishClientSpan(err error) {
+func (s *tracedClientStream) finishClientSpan(ctx context.Context, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.alreadyFinished {
-		finishClientSpan(s.clientSpan, err)
+		finishClientSpan(s.clientSpan, ctx, err)
 		s.alreadyFinished = true
 	}
 }
 
-func finishClientSpan(clientSpan *Span, err error) {
-	if err != nil && err != io.EOF {		
-		clientSpan.SetLabel(LabelError, err.Error())		
+func finishClientSpan(clientSpan *Span, ctx context.Context, err error) {
+	// log stream client grpc
+	client := clientSpan.Client()
+	if client != nil && client.logOptions.entry != nil {
+		method := clientSpan.Name()
+		var logErr error
+		if err != nil && err != io.EOF {
+			logErr = err
+		}
+		logGrpcClientLine(client.logOptions, ctx, method, clientSpan.Start(), logErr, fmt.Sprintf("finished client call %s.", method))
+	}
+
+	if err != nil && err != io.EOF {
+		clientSpan.SetLabel(LabelError, err.Error())
 	}
 	clientSpan.Finish()
 }
@@ -179,9 +187,15 @@ func (c *Client) GRPCUnaryServerInterceptor() grpc.UnaryServerInterceptor {
 		if header, ok := md[grpcMetadataKey]; ok {
 			span = c.SpanFromContext(info.FullMethod, header[0])
 			defer span.Finish()
-		}		
+		}
 		ctx = NewContext(ctx, span)
-		return handler(ctx, req)
+		resp, err = handler(ctx, req)
+
+		// log unary server grpc
+		if c.logOptions.entry != nil {
+			logGrpcClientLine(c.logOptions, ctx, info.FullMethod, span.Start(), err, fmt.Sprintf("finished service %s.", info.FullMethod))
+		}
+		return
 	}
 }
 
@@ -226,6 +240,11 @@ func (c *Client) GRPStreamServerInterceptor() grpc.StreamServerInterceptor {
 		wrappedStream := wrapServerStream(stream)
 		wrappedStream.WrappedContext = ctx
 		err := handler(srv, stream)
+
+		// log stream server grpc
+		if c.logOptions.entry != nil {
+			logGrpcClientLine(c.logOptions, ctx, info.FullMethod, span.Start(), err, fmt.Sprintf("finished service %s.", info.FullMethod))
+		}		
 		return err
 	}
 }
