@@ -38,7 +38,7 @@ func RegisterWithEtcd(serviceName string, target string, ep Endpoint, interval, 
     initEndpointWithDefault(&ep)
 
 	addressValue := fmt.Sprintf("%s:%d", ep.Host, ep.Port)
-	serviceKey = fmt.Sprintf("/%s/%s/%s", Prefix, serviceName, addressValue)
+	serviceKey = fmt.Sprintf("/%s/%s/%s", GRPCPrefix, serviceName, addressValue)
     endpointValue, _ := json.Marshal(&ep)
 
 	// get endpoints for register dial address

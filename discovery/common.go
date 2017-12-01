@@ -1,7 +1,7 @@
 package discovery
 
-// Prefix is leading path of gprc service
-const Prefix = "gprc-service"
+// GRPCPrefix is leading path of gprc service
+const GRPCPrefix = "gprc-service"
 
 // DefaultGroup is default group name
 const DefaultGroup = "DEFAULT_GROUP"
