@@ -18,8 +18,8 @@ func ConvertToZipkinSpan(s *trace.Span) (*zipkincore.Span, error) {
 		return nil, err
 	}
 
-	low := int64(binary.LittleEndian.Uint64(tid[:8]))
-	high := int64(binary.LittleEndian.Uint64(tid[8:]))
+	high := int64(binary.LittleEndian.Uint64(tid[:8]))
+	low := int64(binary.LittleEndian.Uint64(tid[8:]))
 	var parentID *int64
 	if s.ParentSpanID() > 0 {
 		parent := int64(s.ParentSpanID())
