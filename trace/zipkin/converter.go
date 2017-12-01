@@ -20,7 +20,11 @@ func ConvertToZipkinSpan(s *trace.Span) (*zipkincore.Span, error) {
 
 	low := int64(binary.LittleEndian.Uint64(tid[:8]))
 	high := int64(binary.LittleEndian.Uint64(tid[8:]))
-	parentID := int64(s.ParentSpanID())
+	var parentID *int64
+	if s.ParentSpanID() > 0 {
+		parent := int64(s.ParentSpanID())
+		parentID = &parent
+	}
 	start := s.StartTime(time.Microsecond)
 	end := s.EndTime(time.Microsecond)
 	duration := end - start
@@ -33,7 +37,7 @@ func ConvertToZipkinSpan(s *trace.Span) (*zipkincore.Span, error) {
 		TraceIDHigh: &high,
 		Name: s.Name(),
 		ID: int64(s.SpanID()),
-		ParentID: &parentID,
+		ParentID: parentID,
 		Timestamp: &start,
 		Duration: &duration,
 		Annotations: make([]*zipkincore.Annotation, 0),

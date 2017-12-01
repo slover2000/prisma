@@ -38,7 +38,7 @@ func IPToInt32(ip string) (int32, error) {
 			return 0, errors.New("invalid ip address")
 		}
 
-		intIP = intIP | i<<uint(8*(3-i))
+		intIP = intIP | k<<uint(8*(3-i))
 	}
 
 	return int32(intIP), nil
