@@ -90,7 +90,7 @@ func buildClientOutgoingContext(parentCtx context.Context, span *Span) context.C
 		md[grpcMetadataKey] = []string{string(traceContext)}
 	}
 	ctx := metadata.NewOutgoingContext(parentCtx, md)
-
+	
 	return ctx
 }
 

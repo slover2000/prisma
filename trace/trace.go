@@ -55,6 +55,7 @@ var (
 )
 
 type contextKey struct{}
+type requsetKey struct{}
 
 func init() {
 	// Set spanIDCounter and spanIDIncrement to random values.  nextSpanID will
