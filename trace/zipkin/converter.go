@@ -107,35 +107,24 @@ func ConvertToZipkinSpan(s *trace.Span) (*zipkincore.Span, error) {
 
 	labels := s.Labels()
 	for k, v := range labels {
+		target := k
 		switch k {
 		case trace.LabelHTTPHost:
-			binAnn := &zipkincore.BinaryAnnotation{
-				Key: zipkincore.HTTP_HOST,
-				Value: []byte(v),
-			}
-			zipkinSpan.BinaryAnnotations = append(zipkinSpan.BinaryAnnotations, binAnn)
-		
+			target = zipkincore.HTTP_HOST
 		case trace.LabelHTTPMethod:
-			binAnn := &zipkincore.BinaryAnnotation{
-				Key: zipkincore.HTTP_METHOD,
-				Value: []byte(v),
-			}
-			zipkinSpan.BinaryAnnotations = append(zipkinSpan.BinaryAnnotations, binAnn)
-			
+			target = zipkincore.HTTP_METHOD
 		case trace.LabelHTTPURL:
-			binAnn := &zipkincore.BinaryAnnotation{
-				Key: zipkincore.HTTP_URL,
-				Value: []byte(v),
-			}
-			zipkinSpan.BinaryAnnotations = append(zipkinSpan.BinaryAnnotations, binAnn)
-			
+			target = zipkincore.HTTP_URL
 		case trace.LabelHTTPStatusCode:
-			binAnn := &zipkincore.BinaryAnnotation{
-				Key: zipkincore.HTTP_STATUS_CODE,
-				Value: []byte(v),
-			}
-			zipkinSpan.BinaryAnnotations = append(zipkinSpan.BinaryAnnotations, binAnn)
+			target = zipkincore.HTTP_STATUS_CODE
+		case trace.LabelError:
+			target = zipkincore.ERROR		
 		}
+		binAnn := &zipkincore.BinaryAnnotation{
+			Key: target,
+			Value: []byte(v),
+		}
+		zipkinSpan.BinaryAnnotations = append(zipkinSpan.BinaryAnnotations, binAnn)			
 	}
 
 	return zipkinSpan, nil

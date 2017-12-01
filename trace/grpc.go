@@ -42,9 +42,8 @@ func (c *Client) grpcUnaryInterceptor(ctx context.Context, method string, req, r
 	}
 
 	err = invoker(outgoingCtx, method, req, reply, cc, opts...)
-	if err != nil {
-		// TODO: standardize gRPC label names?
-		span.SetLabel("error", err.Error())
+	if err != nil {		
+		span.SetLabel(LabelError, err.Error())
 	}
 	return err
 }
@@ -69,9 +68,8 @@ func (c *Client) GRPCStreamClientInterceptor() grpc.StreamClientInterceptor {
 		}
 
 		clientStream, err := streamer(outgoingCtx, desc, cc, method, opts...)
-		if err != nil {
-			// TODO: standardize gRPC label names?
-			span.SetLabel("error", err.Error())
+		if err != nil {			
+			span.SetLabel(LabelError, err.Error())
 			finishClientSpan(span, err)
 			return nil, err
 		}
@@ -154,9 +152,8 @@ func (s *tracedClientStream) finishClientSpan(err error) {
 }
 
 func finishClientSpan(clientSpan *Span, err error) {
-	if err != nil && err != io.EOF {
-		// TODO: standardize gRPC label names?
-		clientSpan.SetLabel("error", err.Error())		
+	if err != nil && err != io.EOF {		
+		clientSpan.SetLabel(LabelError, err.Error())		
 	}
 	clientSpan.Finish()
 }

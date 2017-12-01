@@ -47,6 +47,7 @@ const (
 	LabelSamplingWeight     = `trace/sampling_weight`
 	LabelStackTrace         = `trace/stacktrace`
 	LabelTID                = `trace/tid`
+	LabelError 				= "error"
 )
 
 var (
