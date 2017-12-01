@@ -62,19 +62,17 @@ func logGrpcClientLine(options *loggingOptions, ctx context.Context, fullMethodS
 
 	code := grpc.Code(err)
 	level := grpcCodeToLogrusLevel(code)
-	if level < loglevelToLogusLevel(options.level) {
-		return
+	if loglevelToLogusLevel(options.level) >= level {
+		durVal := time.Now().Sub(startTime)	
+		fields := newGrpcClientLoggerFields(ctx, fullMethodString)
+		fields[GRPCCodeField] = code.String()
+		fields[GRPCDurationField] = durVal
+		if err != nil {
+			fields[logrus.ErrorKey] = err
+		}
+	
+		logMessageWithLevel(options.entry.WithFields(fields), level, msg)	
 	}
-
-	durVal := time.Now().Sub(startTime)	
-	fields := newGrpcClientLoggerFields(ctx, fullMethodString)
-	fields[GRPCCodeField] = code.String()
-	fields[GRPCDurationField] = durVal
-	if err != nil {
-		fields[logrus.ErrorKey] = err
-	}
-
-	logMessageWithLevel(options.entry.WithFields(fields), level, msg)
 }
 
 func logHttpClientLine(options *loggingOptions, req *http.Request, startTime time.Time, code int, msg string) {
@@ -83,15 +81,13 @@ func logHttpClientLine(options *loggingOptions, req *http.Request, startTime tim
 	}
 
 	level := httpCodeToLogrusLevel(code)
-	if level < loglevelToLogusLevel(options.level) {
-		return
+	if loglevelToLogusLevel(options.level) >= level {
+		durVal := time.Now().Sub(startTime)	
+		fields := newHttpClientLoggerFields(req)
+		fields[LabelHTTPStatusCode] = strconv.Itoa(code)
+		fields[LabelHTTPDuration] = durVal
+		logMessageWithLevel(options.entry.WithFields(fields), level, msg)
 	}
-
-	durVal := time.Now().Sub(startTime)	
-	fields := newHttpClientLoggerFields(req)
-	fields[LabelHTTPStatusCode] = strconv.Itoa(code)
-	fields[LabelHTTPDuration] = durVal
-	logMessageWithLevel(options.entry.WithFields(fields), level, msg)
 }
 
 func newGrpcClientLoggerFields(ctx context.Context, fullMethodString string) logrus.Fields {
