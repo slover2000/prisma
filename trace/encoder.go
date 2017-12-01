@@ -1,6 +1,7 @@
 package trace
 
 import (
+	"time"
 	"encoding/binary"
 	"encoding/json"
 )
@@ -119,8 +120,8 @@ func (r *JSONEncoder) Encode(s *Span) []byte {
 		ProjectID: s.trace.client.projectID,
 		TraceID: s.TraceID(),
 		Span: JSONSpanData{
-			StartTime: s.start.Unix(),
-			EndTime: s.end.Unix(),
+			StartTime: s.start.UnixNano() / int64(time.Microsecond),
+			EndTime: s.end.UnixNano() / int64(time.Microsecond),
 			Name: s.name,
 			Kind: s.kind,
 			SpanID: s.spanID,
