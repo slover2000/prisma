@@ -1,6 +1,7 @@
 package zipkin
 
 import (
+	"fmt"
 	"time"
 	"errors"
 	"encoding/hex"
@@ -106,7 +107,7 @@ func ConvertToZipkinSpan(s *trace.Span) (*zipkincore.Span, error) {
 	}
 
 	labels := s.Labels()
-	for k, v := range labels {
+	for k, v := range labels {		
 		target := k
 		switch k {
 		case trace.LabelHTTPHost:
@@ -123,6 +124,7 @@ func ConvertToZipkinSpan(s *trace.Span) (*zipkincore.Span, error) {
 		binAnn := &zipkincore.BinaryAnnotation{
 			Key: target,
 			Value: []byte(v),
+			AnnotationType: zipkincore.AnnotationType_STRING,
 		}
 		zipkinSpan.BinaryAnnotations = append(zipkinSpan.BinaryAnnotations, binAnn)			
 	}
