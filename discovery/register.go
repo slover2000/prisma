@@ -23,27 +23,27 @@ type registerOptions struct {
 
 type RegisterOption func(*registerOptions)
 
-func WithSystemName(name string) RegisterOption {
+func WithRegisterSystem(name string) RegisterOption {
     return func(c *registerOptions) { c.systemName = name }
 }
 
-func WithServiceName(name string) RegisterOption {
+func WithRegisterService(name string) RegisterOption {
     return func(c *registerOptions) { c.serviceName = name }
 }
 
-func WithEndpoint(ep Endpoint) RegisterOption {
+func WithRegisterEndpoint(ep Endpoint) RegisterOption {
     return func(c *registerOptions) { c.endpoint = ep }
 }
 
-func WithDialTimeout(timeout time.Duration) RegisterOption {
+func WithRegisterDialTimeout(timeout time.Duration) RegisterOption {
     return func(c *registerOptions) { c.dialTimeout = timeout }
 }
 
-func WithKeyFreshInterval(interval time.Duration) RegisterOption {
+func WithRegisterInterval(interval time.Duration) RegisterOption {
     return func(c *registerOptions) { c.interval = interval }
 }
 
-func WithKeyTTL(ttl time.Duration) RegisterOption {
+func WithRegisterTTL(ttl time.Duration) RegisterOption {
     return func(c *registerOptions) { c.ttl = ttl }
 }
 
@@ -173,10 +173,6 @@ var client clientv3.Client
 var serviceKey string
 
 func initEndpointWithDefault(ep *Endpoint) {
-    if len(ep.Group) == 0 {
-        ep.Group = DefaultGroup
-    }
-
     if ep.Weight == 0 {
         ep.Weight = DefaultWeight
     }

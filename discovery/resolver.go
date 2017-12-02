@@ -17,26 +17,139 @@ import (
 
 // resolver is the implementaion of grpc.naming.Resolver
 type etcdResolver struct {
+	systemName	string
 	serviceName string
-	groupName	string
+	environment EnvironmentType
+	groupName		string
 	dialTimeout time.Duration
+	client      *clientv3.Client
+	closed 			bool
+}
+
+type ResolverOption func(*etcdResolver)
+
+func WithResolverSystem(name string) ResolverOption {
+	return func(r *etcdResolver) { r.systemName = name }
+}
+
+func WithResolverService(name string) ResolverOption {
+	return func(r *etcdResolver) { r.serviceName = name }
+}
+
+func WithEnvironment(t EnvironmentType) ResolverOption {
+	return func(r *etcdResolver) { r.environment = t }
+}
+
+func WithResolverGroup(name string) ResolverOption {
+	return func(r *etcdResolver) { r.groupName = name }
+}
+
+func WithDialTimeout(timeout time.Duration) ResolverOption {
+	return func(r *etcdResolver) { r.dialTimeout = timeout }
 }
 
 // etcdWatcher is the implementaion of grpc.naming.Watcher
 type etcdWatcher struct {
 	resolver      *etcdResolver
-	client        *clientv3.Client
 	isInitialized bool
 }
 
 // NewResolver return resolver with service name
-func NewEtcdResolver(serviceName string, timeout time.Duration) *etcdResolver {
-	return &etcdResolver{serviceName: serviceName, dialTimeout: timeout}
+func NewEtcdResolver(options ...ResolverOption) *etcdResolver {
+	resolver := &etcdResolver{
+		systemName: GRPCSystem,
+		environment: Product,
+		dialTimeout: 5 * time.Second,
+	}
+
+	for _, option := range options {
+		option(resolver)
+	}
+
+	return resolver
 }
 
-// NewResolver return resolver with service name
-func NewEtcdResolverWithGroup(serviceName, groupName string, timeout time.Duration) *etcdResolver {
-	return &etcdResolver{serviceName: serviceName, groupName: groupName, dialTimeout: timeout}
+type Operation = string
+const (
+	Add			= "add"
+	Delete 	= "del"
+)
+
+type Update struct {
+	Op		Operation
+	Addr	string
+	Meta 	interface{}
+}
+
+type ChangeReceiver func([]*Update)
+
+func (r *etcdResolver) Watch(target string, receiver ChangeReceiver) ([]*Update, error) {
+	if len(r.serviceName) == 0 {
+		return nil, errors.New("no service name provided")
+	}
+
+	client, err := clientv3.New(clientv3.Config{
+		Endpoints:   strings.Split(target, ","),
+		DialTimeout: r.dialTimeout,
+	})
+	if err != nil {
+		return nil, err
+	}
+	r.client = client
+
+	prefix := fmt.Sprintf("/%s/%s/%s", r.systemName, r.serviceName, EnviormentTypeToString(r.environment))
+	// query addresses from etcd
+	ctx, cancel := context.WithTimeout(context.Background(), r.dialTimeout)
+	resp, err := r.client.Get(ctx, prefix, clientv3.WithPrefix())
+	cancel()
+	if err == nil {
+		updates := []*Update{}
+		addrs := extractAddrs(resp, r.groupName)
+		//if not empty, return the updates
+		if l := len(addrs); l != 0 {
+			updates := make([]*Update, l)
+			for i, ep := range addrs {
+				addr := fmt.Sprintf("%s:%d", ep.Host, ep.Port)
+				updates[i] = &Update{Op: Add, Addr: addr, Meta: &ep}
+			}
+		}
+
+		if receiver != nil {
+			// start goroutine to watch
+			go func(c *etcdResolver, path string, r ChangeReceiver) {
+				// watch the path
+				for {
+					rch := c.client.Watch(context.Background(), path, clientv3.WithPrefix())
+					for wresp := range rch {
+						for _, ev := range wresp.Events {
+							ep := decodeEndpointFromEvent(ev)
+							addr := fmt.Sprintf("%s:%d", ep.Host, ep.Port)
+							switch ev.Type {
+							case mvccpb.PUT:
+								r([]*Update{{Op: Add, Addr: addr, Meta: &ep}})
+							case mvccpb.DELETE:
+								r([]*Update{{Op: Delete, Addr: addr, Meta: &ep}})
+							}
+						}
+					}
+					if c.closed {
+						return
+					}
+				}
+			}(r, prefix, receiver)
+		}
+
+		return updates, nil
+	} else {
+		log.Printf("etcd resolver: get key with prefix[%s] failed:%s", prefix, err.Error())
+		return nil, err
+	}
+}
+
+// Close close etcd v3 client
+func (r *etcdResolver) Close() {
+	r.client.Close()
+	r.closed = true
 }
 
 // @Title resolve the service from etcd, target is the dial address of etcd 
@@ -56,24 +169,24 @@ func (r *etcdResolver) Resolve(target string) (naming.Watcher, error) {
 	if err != nil {
 		return nil, fmt.Errorf("grpclb: creat etcd3 client failed: %s", err.Error())
 	}
-
-	return &etcdWatcher{resolver: r, client: client}, nil
+	r.client = client
+	return &etcdWatcher{resolver: r}, nil
 }
 
 // Close close etcd v3 client
 func (w *etcdWatcher) Close() {
-	w.client.Close()
+	w.resolver.client.Close()
 }
 
 // Next to return the updates
 func (w *etcdWatcher) Next() ([]*naming.Update, error) {
 	// prefix is the etcd prefix/value to watch
-	prefix := fmt.Sprintf("/%s/%s/", GRPCSystem, w.resolver.serviceName)
+	prefix := fmt.Sprintf("/%s/%s/%s", w.resolver.systemName, w.resolver.serviceName, EnviormentTypeToString(w.resolver.environment))
 	// check if is initialized
 	if !w.isInitialized {
 		// query addresses from etcd
 		ctx, cancel := context.WithTimeout(context.Background(), w.resolver.dialTimeout)
-		resp, err := w.client.Get(ctx, prefix, clientv3.WithPrefix())
+		resp, err := w.resolver.client.Get(ctx, prefix, clientv3.WithPrefix())
 		cancel()
 		if err == nil {
 			w.isInitialized = true
@@ -92,7 +205,7 @@ func (w *etcdWatcher) Next() ([]*naming.Update, error) {
 		}
 	}
 	// generate etcd Watcher
-	rch := w.client.Watch(context.Background(), prefix, clientv3.WithPrefix())
+	rch := w.resolver.client.Watch(context.Background(), prefix, clientv3.WithPrefix())
 	for wresp := range rch {
 		for _, ev := range wresp.Events {
 			ep := decodeEndpointFromEvent(ev)
@@ -118,10 +231,13 @@ func extractAddrs(resp *clientv3.GetResponse, group string) []Endpoint {
 		if v := resp.Kvs[i].Value; v != nil {
 			ep := &Endpoint{}
 			json.Unmarshal(v, ep)
-			if len(group) > 0 && group != ep.Group {
-				continue
+			if len(ep.Group) == 0 || ep.Group == DefaultGroup {
+				addrs = append(addrs, *ep)
+			} else if len(group) > 0 && group != DefaultGroup {
+				if group == ep.Group {
+					addrs = append(addrs, *ep)
+				}
 			}
-			addrs = append(addrs, *ep)
 		}
 	}
 	return addrs
