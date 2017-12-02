@@ -91,7 +91,7 @@ type Client struct {
 	logOptions	*loggingOptions
 }
 
-// NewClient creates a new Google Stackdriver Trace client.
+// NewClient creates a new Trace client.
 func NewClient(ctx context.Context, projectID string) (*Client, error) {
 	defaultPolicy, _ := NewLimitedSampler(defaultSampleRate, defaultMaxQPS)
 	c := &Client{
