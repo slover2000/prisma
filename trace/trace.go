@@ -88,7 +88,6 @@ type Client struct {
 	projectID 	string
 	policy    	SamplingPolicy
 	collector		Collector
-	logOptions	*loggingOptions
 }
 
 // NewClient creates a new Trace client.
@@ -98,7 +97,6 @@ func NewClient(ctx context.Context, projectID string) (*Client, error) {
 		projectID: projectID,
 		policy: defaultPolicy,
 		collector: NewNopCollector(),
-		logOptions: defaultLoggingOptions,
 	}
 	return c, nil
 }
@@ -106,24 +104,18 @@ func NewClient(ctx context.Context, projectID string) (*Client, error) {
 // SetSamplingPolicy sets the SamplingPolicy that determines how often traces
 // are initiated by this client.
 func (c *Client) SetSamplingPolicy(p SamplingPolicy) {
-	if c != nil {
+	if c != nil && p != nil {
 		c.policy = p
 	}
 }
 
 // SetRecorder sets the recorder of the trace
 func (c *Client) SetCollector(t Collector) {
-	if c != nil {
+	if c != nil && t != nil {
 		// close previous collector
 		c.collector.Close()
 		// assign a new collector
 		c.collector = t
-	}
-}
-
-func (c *Client) ConfigLogger(options ...LoggingOption) {
-	for _, option := range options {
-		option(c.logOptions)
 	}
 }
 
@@ -170,7 +162,7 @@ func (c *Client) SpanFromContext(name string, header string) *Span {
 	if c == nil {
 		return nil
 	}
-	traceIDBytes, parentSpanID, opts, ok := unpackTrace([]byte(header))
+	traceIDBytes, parentSpanID, opts, ok := UnpackTrace([]byte(header))
 	var traceID string
 	if !ok {
 		traceID = nextTraceID()
@@ -258,6 +250,10 @@ func (c *Client) newSpan(name, kind string) *Span {
 	span.kind = kind
 	configureSpanFromPolicy(span, c.policy, false)
 	return span
+}
+
+func (c *Client) ConfigureSpanFromPolicy(s *Span, ok bool) {
+	configureSpanFromPolicy(s, c.policy, ok)
 }
 
 func configureSpanFromPolicy(s *Span, p SamplingPolicy, ok bool) {
@@ -506,6 +502,20 @@ func (s *Span) SpanID() uint64 {
 		return 0
 	}
 	return s.spanID
+}
+
+func (s *Span) TraceGloablOptions() uint32 {
+	if s == nil {
+		return 0
+	}
+	return s.trace.globalOptions
+}
+
+func (s *Span) TraceLocalOptions() uint32 {
+	if s == nil {
+		return 0
+	}
+	return s.trace.localOptions
 }
 
 func (s *Span) ParentSpanID() uint64 {

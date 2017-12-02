@@ -111,6 +111,6 @@ func (s *nopSampler) Sample(p Parameters) Decision {
 	return Decision{}
 }
 
-func NewNopSampler() (SamplingPolicy, error) {
-	return &nopSampler{}, nil
+func NewNopSampler() SamplingPolicy {
+	return &nopSampler{}
 }
