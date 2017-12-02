@@ -8,7 +8,5 @@
     "go.useCodeSnippetsOnFunctionSuggest": false,
     "go.formatOnSave": false,
     "go.formatTool": "goreturns",
-    "go.goroot": "D:\\Go",
-    "go.gopath": "C:\\Users\\jianglifeng\\go",
     "files.autoSave": "onFocusChange"
 }

@@ -102,3 +102,15 @@ func NewLimitedSampler(fraction, maxqps float64) (SamplingPolicy, error) {
 	}
 	return &s, nil
 }
+
+type nopSampler struct {
+
+}
+
+func (s *nopSampler) Sample(p Parameters) Decision {
+	return Decision{}
+}
+
+func NewNopSampler() (SamplingPolicy, error) {
+	return &nopSampler{}, nil
+}

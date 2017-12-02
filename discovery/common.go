@@ -1,7 +1,10 @@
 package discovery
 
-// GRPCPrefix is leading path of gprc service
-const GRPCPrefix = "gprc-service"
+// GRPCSystem is leading path of gprc service
+const GRPCSystem = "gprc"
+const RedisSystem = "redis"
+const MysqlSystem = "mysql"
+const MongoSystem = "mongo"
 
 // DefaultGroup is default group name
 const DefaultGroup = "DEFAULT_GROUP"
@@ -29,3 +32,16 @@ type (
 		Group 	string	`json:"group"`
 	}
 )
+
+func EnviormentTypeToString(t EnvironmentType) string {
+	switch t {
+	case Staging:
+		return "staging"
+	case Preview:
+		return "preview"
+	case Product:
+		return "product"
+	default:
+		return "unknown"
+	}
+}

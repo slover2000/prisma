@@ -68,7 +68,7 @@ func (w *etcdWatcher) Close() {
 // Next to return the updates
 func (w *etcdWatcher) Next() ([]*naming.Update, error) {
 	// prefix is the etcd prefix/value to watch
-	prefix := fmt.Sprintf("/%s/%s/", GRPCPrefix, w.resolver.serviceName)
+	prefix := fmt.Sprintf("/%s/%s/", GRPCSystem, w.resolver.serviceName)
 	// check if is initialized
 	if !w.isInitialized {
 		// query addresses from etcd

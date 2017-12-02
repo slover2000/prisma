@@ -87,7 +87,7 @@ func nextTraceID() string {
 type Client struct {
 	projectID 	string
 	policy    	SamplingPolicy
-	collector	Collector
+	collector		Collector
 	logOptions	*loggingOptions
 }
 
