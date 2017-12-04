@@ -84,6 +84,14 @@ func (c *perfcounterClient) countHistogram(name string, duration time.Duration, 
 	histogram.Update(milliscond)
 }
 
+func (c *perfcounterClient)RegisterHttpHandler(endpoint string) {
+
+}
+
+func (c *perfcounterClient) Close() error {
+	return nil
+}
+
 func makeMetricsName(name, suffix string, err error) string {
 	realName := m.ConvertMethodName(name)
 	if len(name) == 0 {

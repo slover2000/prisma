@@ -18,6 +18,8 @@ const (
 type ClientMetrics interface {
 	CounterGRPC(name string, duration time.Duration, err error)
 	CounterHTTP(req *http.Request, duration time.Duration, code int)
+	RegisterHttpHandler(endpoint string)
+	Close() error
 }
 
 func SplitGRPCMethodName(fullMethodName string) (string, string) {

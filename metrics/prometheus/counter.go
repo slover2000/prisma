@@ -10,10 +10,12 @@ import (
 	m "github.com/slover2000/prisma/metrics"
 	"github.com/slover2000/prisma/utils"
 	prom "github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
 	defaultProjectName	= "default_project"
+	defaultReportInterval = 60
 )
 
 type prometheusClient struct {
@@ -135,7 +137,7 @@ func NewHTTPServerPrometheus(project string) m.ClientMetrics {
 			prom.CounterOpts{
 				Name: fmt.Sprintf("%s_http_server_qps", project),
 				Help: fmt.Sprintf("%s: total number of http completed by the server, regardless of success or failure.", project),
-			}, []string{"host", "domain", "path", "code"}),
+			}, []string{"host", "domain", "path", "method", "code"}),
 
 		latencyHistogram: prom.NewHistogramVec(
 			prom.HistogramOpts{
@@ -143,7 +145,7 @@ func NewHTTPServerPrometheus(project string) m.ClientMetrics {
 				Help: fmt.Sprintf("%s: histogram of response latency (milliseconds) of the http until it is finished by the application.", project),
 				Buckets: prom.DefBuckets,
 			},
-			[]string{"host", "domain", "path", "code"},
+			[]string{"host", "domain", "path", "method", "code"},
 		),
 	}
 	prom.MustRegister(client.qpsCounter)
@@ -177,12 +179,20 @@ func (c *prometheusClient) CounterHTTP(req *http.Request, duration time.Duration
 	}
 		
 	// 记录Counter, like QPS
-	c.qpsCounter.WithLabelValues(c.host, req.URL.Host, req.URL.Path, fmt.Sprintf("%d", code)).Inc()
+	c.qpsCounter.WithLabelValues(c.host, req.URL.Host, req.URL.Path, req.Method, fmt.Sprintf("%d", code)).Inc()
 
 	// 记录Histogram, in millisecond, measure cost time of every method
 	ms := duration.Nanoseconds() / int64(time.Millisecond)
 	if ms == 0 {
 		ms = 1
 	}
-	c.latencyHistogram.WithLabelValues(c.host, req.URL.Host, req.URL.Path, fmt.Sprintf("%d", code)).Observe(float64(ms))
+	c.latencyHistogram.WithLabelValues(c.host, req.URL.Host, req.URL.Path, req.Method, fmt.Sprintf("%d", code)).Observe(float64(ms))
+}
+
+func (c *prometheusClient)RegisterHttpHandler(endpoint string) {
+	http.Handle(endpoint, promhttp.Handler())
+}
+
+func (c *prometheusClient) Close() error {
+	return nil
 }
