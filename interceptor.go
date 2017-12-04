@@ -41,6 +41,7 @@ type tracingOptions struct {
 
 type metricsOptions struct {
 	projectID 	string
+	exposeEp	string
 	grpceCient	bool
 	grpcServer  bool
 	httpClient  bool
@@ -70,6 +71,11 @@ func WithTracing(project string, policy trace.SamplingPolicy, collector trace.Co
 // WithMetricsProject config metrics system
 func WithMetricsProject(project string) InterceptorOption {
 	return func (i *interceptorOptions) { i.metrics.projectID = project }
+}
+
+// WithMetricseExposeEndpoint config expose endpoint
+func WithMetricseExposeEndpoint(endpoint string) InterceptorOption {
+	return func (i *interceptorOptions) { i.metrics.exposeEp = endpoint }
 }
 
 // EnableGRPCClientMetrics config metrics system
@@ -124,18 +130,22 @@ func NewInterceptorClient(ctx context.Context, options ...InterceptorOption) (*I
 	if len(intercepOptions.metrics.projectID) > 0 {
 		if intercepOptions.metrics.grpceCient {
 			client.grpcClientMetrics = prometheus.NewGRPCClientPrometheus(intercepOptions.metrics.projectID)
+			client.grpcClientMetrics.RegisterHttpHandler(intercepOptions.metrics.exposeEp)
 		}
 
 		if intercepOptions.metrics.grpcServer {
 			client.grpcServerMetrics = prometheus.NewGRPCServerPrometheus(intercepOptions.metrics.projectID)
+			client.grpcServerMetrics.RegisterHttpHandler(intercepOptions.metrics.exposeEp)
 		}
 
 		if intercepOptions.metrics.httpClient {
 			client.httpClientMetrics = prometheus.NewHTTPClientPrometheus(intercepOptions.metrics.projectID)
+			client.grpcServerMetrics.RegisterHttpHandler(intercepOptions.metrics.exposeEp)
 		}
 
 		if intercepOptions.metrics.httpServer {
 			client.httpServerMetrics = prometheus.NewHTTPServerPrometheus(intercepOptions.metrics.projectID)
+			client.httpServerMetrics.RegisterHttpHandler(intercepOptions.metrics.exposeEp)
 		}
 	}
 
