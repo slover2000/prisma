@@ -2,6 +2,7 @@ package prisma
 
 import (
 	"fmt"
+	"time"
 	"net/http"
 
 	"github.com/slover2000/prisma/trace"
@@ -12,7 +13,7 @@ import (
 // Transport is safe for concurrent usage.
 type Transport struct {
 	Client 	*InterceptorClient
-	Base 		http.RoundTripper
+	Base    http.RoundTripper
 }
 
 // RoundTrip creates a trace.Span and inserts it into the outgoing request's headers.
@@ -20,6 +21,7 @@ type Transport struct {
 // the request's context.
 func (t Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	span := trace.FromContext(req.Context()).NewRemoteChild(req)
+	startTime := time.Now()
 	resp, err := t.base().RoundTrip(req)
 
 	// TODO(jbd): Is it possible to defer the span.Finish?
@@ -31,6 +33,11 @@ func (t Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if resp != nil {
 		statusCode = resp.StatusCode
 	}
+
+	// do metrics
+	t.Client.httpClientMetrics.CounterHTTP(req, time.Now().Sub(startTime), statusCode)
+
+	// log request
 	t.Client.log.LogHttpClientLine(req, span.Start(), statusCode, fmt.Sprintf("%s finished.", req.URL.String()))
 	return resp, err
 }
@@ -50,6 +57,24 @@ func (t Transport) base() http.RoundTripper {
 		return t.Base
 	}
 	return http.DefaultTransport
+}
+
+type withStatusCodeResponseWriter struct {
+	writer     http.ResponseWriter
+	statusCode int
+}
+
+func (w *withStatusCodeResponseWriter) Header() http.Header {
+	return w.writer.Header()
+}
+
+func (w *withStatusCodeResponseWriter) Write(bytes []byte) (int, error) {
+	return w.writer.Write(bytes)
+}
+
+func (w *withStatusCodeResponseWriter) WriteHeader(code int) {
+	w.statusCode = code
+	w.writer.WriteHeader(code)
 }
 
 // HTTPHandler returns a http.Handler from the given handler
@@ -82,5 +107,11 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 	// TODO(jbd): Remove when there is a better way to report the client's sampling.
 	// 	w.Header().Set(httpTraceHeader, spanHeader(traceID, parentSpanID, span.trace.localOptions))
 	// }
-	h.handler.ServeHTTP(w, r)
+	
+	rw := &withStatusCodeResponseWriter{writer: w}
+	startTime := time.Now()
+	h.handler.ServeHTTP(rw, r)
+
+	// do metrics
+	h.client.httpServerMetrics.CounterHTTP(r, time.Now().Sub(startTime), rw.statusCode)
 }

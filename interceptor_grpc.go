@@ -1,6 +1,7 @@
 package prisma
 
 import (
+	"time"
 	"fmt"
 	"io"
 	"sync"
@@ -39,10 +40,15 @@ func (c *InterceptorClient) grpcUnaryInterceptor(ctx context.Context, method str
 	defer span.Finish()
 	
 	outgoingCtx := buildClientOutgoingContext(ctx, span)
+
+	startTime := time.Now()
 	err := invoker(outgoingCtx, method, req, reply, cc, opts...)
 	if err != nil {
 		span.SetLabel(trace.LabelError, err.Error())
 	}
+
+	// do metrics
+	c.grpcClientMetrics.CounterGRPC(method, time.Now().Sub(startTime), err)
 
 	// log unary client grpc	
 	c.log.LogGrpcClientLine(outgoingCtx, method, span.Start(), err, fmt.Sprintf("finished client call %s.", method))
@@ -66,10 +72,10 @@ func (c *InterceptorClient) GRPCStreamClientInterceptor() grpc.StreamClientInter
 		outgoingCtx := buildClientOutgoingContext(ctx, span)
 		clientStream, err := streamer(outgoingCtx, desc, cc, method, opts...)
 		if err != nil {		
-			finishClientSpan(outgoingCtx, c, span, err)
+			finishClientSpan(outgoingCtx, c, span, time.Now(), err)
 			return nil, err
 		}
-		return &tracedClientStream{ClientStream: clientStream, client: c, clientSpan: span}, nil
+		return &tracedClientStream{ClientStream: clientStream, startTime: time.Now(), client: c, clientSpan: span}, nil
 	}
 }
 
@@ -103,8 +109,9 @@ type tracedClientStream struct {
 	grpc.ClientStream
 	mu              	sync.Mutex
 	alreadyFinished 	bool
-	client 						*InterceptorClient
-	clientSpan				*trace.Span
+	startTime			time.Time
+	client 				*InterceptorClient
+	clientSpan			*trace.Span
 }
 
 func (s *tracedClientStream) Header() (metadata.MD, error) {
@@ -143,18 +150,22 @@ func (s *tracedClientStream) finishClientSpan(err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.alreadyFinished {
-		finishClientSpan(s.Context(), s.client, s.clientSpan, err)
+		finishClientSpan(s.Context(), s.client, s.clientSpan, s.startTime, err)
 		s.alreadyFinished = true
 	}
 }
 
-func finishClientSpan(ctx context.Context, client *InterceptorClient, clientSpan *trace.Span, err error) {
-	// log stream client grpc
+func finishClientSpan(ctx context.Context, client *InterceptorClient, clientSpan *trace.Span, startTime time.Time, err error) {	
 	method := clientSpan.Name()
 	var logErr error
 	if err != nil && err != io.EOF {
 		logErr = err
 	}
+
+	// do metrics
+	client.grpcClientMetrics.CounterGRPC(method, time.Now().Sub(startTime), logErr)
+
+	// log stream client grpc
 	client.log.LogGrpcClientLine(ctx, method, clientSpan.Start(), logErr, fmt.Sprintf("finished client call %s.", method))
 
 	if err != nil && err != io.EOF {
@@ -185,8 +196,13 @@ func (c *InterceptorClient) GRPCUnaryServerInterceptor() grpc.UnaryServerInterce
 			span = c.trace.SpanFromContext(info.FullMethod, header[0])
 			defer span.Finish()
 		}
+		
 		ctx = trace.NewContext(ctx, span)
+		startTime := time.Now()
 		resp, err = handler(ctx, req)
+
+		// do metrics
+		c.grpcServerMetrics.CounterGRPC(info.FullMethod, time.Now().Sub(startTime), err)
 
 		// log unary server grpc
 		c.log.LogGrpcClientLine(ctx, info.FullMethod, span.Start(), err, fmt.Sprintf("finished service %s.", info.FullMethod))
@@ -229,12 +245,16 @@ func (c *InterceptorClient) GRPStreamServerInterceptor() grpc.StreamServerInterc
 		if header, ok := md[grpcMetadataKey]; ok {
 			span = c.trace.SpanFromContext(info.FullMethod, header[0])
 			defer span.Finish()
-		}		
+		}
 		
 		ctx = trace.NewContext(ctx, span)
 		wrappedStream := wrapServerStream(stream)
 		wrappedStream.WrappedContext = ctx
+		startTime := time.Now()
 		err := handler(srv, stream)
+
+		// do metrics
+		c.grpcServerMetrics.CounterGRPC(info.FullMethod, time.Now().Sub(startTime), err)
 
 		// log stream server grpc
 		c.log.LogGrpcClientLine(ctx, info.FullMethod, span.Start(), err, fmt.Sprintf("finished service %s.", info.FullMethod))

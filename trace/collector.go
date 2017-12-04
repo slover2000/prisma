@@ -1,6 +1,7 @@
 package trace
 
 import (
+	"fmt"
 	"log"
 )
 
@@ -41,8 +42,34 @@ func NewLogCollector() Collector {
 	return &LogCollector{encoder: NewTraceEncoder(JSONEncoderType)}
 }
 
+type ConsoleCollector struct {
+	encoder TraceEncoder
+}
+
+func (r *ConsoleCollector) Collect(span *Span) error {
+	fmt.Sprintln(string(r.encoder.Encode(span)))
+	return nil
+}
+
+func (r *ConsoleCollector) Close() error {
+	return nil
+}
+
+func NewConsoleCollector() Collector {
+	return &ConsoleCollector{}
+}
+
 // MultiCollector implements Collector by sending spans to all collectors.
 type MultiCollector []Collector
+
+func NewMultiCollector(collectors ...Collector) Collector {
+	multiCollector := make([]Collector, len(collectors))
+	for i := range collectors {
+		multiCollector[i] = collectors[i]
+	}
+
+	return MultiCollector(multiCollector)
+}
 
 // Collect implements Collector.
 func (c MultiCollector) Collect(s *Span) error {

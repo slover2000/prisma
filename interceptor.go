@@ -8,28 +8,43 @@ import (
 
 	"github.com/slover2000/prisma/trace"
 	"github.com/slover2000/prisma/logging"
+	"github.com/slover2000/prisma/metrics"
+	"github.com/slover2000/prisma/metrics/prometheus"
 )
 
 // InterceptorClient a client for interceptor 
 type InterceptorClient struct {
-	trace		*trace.Client
-	log			*logging.Client
+	trace				*trace.Client
+	log					*logging.Client
+	grpcClientMetrics   metrics.ClientMetrics
+	grpcServerMetrics   metrics.ClientMetrics
+	httpClientMetrics	metrics.ClientMetrics
+	httpServerMetrics	metrics.ClientMetrics
 }
 
 type interceptorOptions struct {
 	tracing		tracingOptions
 	logging		loggingOptions
+	metrics     metricsOptions
 }
 
 type loggingOptions struct {
-	level				logging.LogLevel
-	entry 			*logrus.Entry
+	level        logging.LogLevel
+	entry        *logrus.Entry
 }
 
 type tracingOptions struct {
 	projectID 	string
-	policy    	trace.SamplingPolicy
-	collector		trace.Collector	
+	policy      trace.SamplingPolicy
+	collector   trace.Collector	
+}
+
+type metricsOptions struct {
+	projectID 	string
+	grpceCient	bool
+	grpcServer  bool
+	httpClient  bool
+	httpServer  bool
 }
 
 // InterceptorOption represents a interceptor option
@@ -50,6 +65,31 @@ func WithTracing(project string, policy trace.SamplingPolicy, collector trace.Co
 		i.tracing.policy = policy
 		i.tracing.collector = collector
 	}
+}
+
+// WithMetricsProject config metrics system
+func WithMetricsProject(project string) InterceptorOption {
+	return func (i *interceptorOptions) { i.metrics.projectID = project }
+}
+
+// EnableGRPCClientMetrics config metrics system
+func EnableGRPCClientMetrics(b bool) InterceptorOption {
+	return func (i *interceptorOptions) { i.metrics.grpceCient = b }
+}
+
+// EnableGRPCServerMetrics config metrics system
+func EnableGRPCServerMetrics(b bool) InterceptorOption {
+	return func (i *interceptorOptions) { i.metrics.grpcServer = b }
+}
+
+// EnableHTTPClientMetrics config metrics system
+func EnableHTTPClientMetrics(b bool) InterceptorOption {
+	return func (i *interceptorOptions) { i.metrics.httpClient = b }
+}
+
+// EnableHTTPServerMetrics config metrics system
+func EnableHTTPServerMetrics(b bool) InterceptorOption {
+	return func (i *interceptorOptions) { i.metrics.httpServer = b }
 }
 
 // NewInterceptorClient create a new interceptor client
@@ -81,5 +121,23 @@ func NewInterceptorClient(ctx context.Context, options ...InterceptorOption) (*I
 		client.log = logClient
 	}
 	
+	if len(intercepOptions.metrics.projectID) > 0 {
+		if intercepOptions.metrics.grpceCient {
+			client.grpcClientMetrics = prometheus.NewGRPCClientPrometheus(intercepOptions.metrics.projectID)
+		}
+
+		if intercepOptions.metrics.grpcServer {
+			client.grpcServerMetrics = prometheus.NewGRPCServerPrometheus(intercepOptions.metrics.projectID)
+		}
+
+		if intercepOptions.metrics.httpClient {
+			client.httpClientMetrics = prometheus.NewHTTPClientPrometheus(intercepOptions.metrics.projectID)
+		}
+
+		if intercepOptions.metrics.httpServer {
+			client.httpServerMetrics = prometheus.NewHTTPServerPrometheus(intercepOptions.metrics.projectID)
+		}
+	}
+
 	return client, nil
 }
