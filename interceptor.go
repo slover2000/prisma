@@ -1,6 +1,7 @@
 package prisma
 
 import (
+	"fmt"
 	"log"
 	
 	"golang.org/x/net/context"
@@ -24,6 +25,7 @@ type InterceptorClient struct {
 }
 
 type interceptorOptions struct {
+	project	    string
 	tracing		tracingOptions
 	logging		loggingOptions
 	metrics     metricsOptions
@@ -34,14 +36,12 @@ type loggingOptions struct {
 	entry        *logrus.Entry
 }
 
-type tracingOptions struct {
-	projectID 	string
+type tracingOptions struct {	
 	policy      trace.SamplingPolicy
 	collector   trace.Collector	
 }
 
 type metricsOptions struct {
-	projectID 	string
 	exposeEp	string
 	grpceCient	bool
 	grpcServer  bool
@@ -53,6 +53,11 @@ type metricsOptions struct {
 // InterceptorOption represents a interceptor option
 type InterceptorOption func(*interceptorOptions)
 
+// WithProject set project ID
+func WithProject(project string) InterceptorOption {
+	return func (i *interceptorOptions) { i.project = project }
+}
+
 // WithLogging config log system
 func WithLogging(level logging.LogLevel, entry *logrus.Entry) InterceptorOption {
 	return func(i *interceptorOptions) { 
@@ -61,18 +66,19 @@ func WithLogging(level logging.LogLevel, entry *logrus.Entry) InterceptorOption 
 	}
 }
 
-// WithTracing config trace system
-func WithTracing(project string, policy trace.SamplingPolicy, collector trace.Collector) InterceptorOption {
+// EnableTracing config trace system
+func EnableTracing(policy trace.SamplingPolicy, collector trace.Collector) InterceptorOption {
 	return func (i *interceptorOptions) {
-		i.tracing.projectID = project
 		i.tracing.policy = policy
 		i.tracing.collector = collector
 	}
 }
 
-// WithMetricsProject config metrics system
-func WithMetricsProject(project string) InterceptorOption {
-	return func (i *interceptorOptions) { i.metrics.projectID = project }
+// EnableTracingWithDefaultSample config trace system
+func EnableTracingWithDefaultSample(collector trace.Collector) InterceptorOption {
+	return func (i *interceptorOptions) {		
+		i.tracing.collector = collector
+	}
 }
 
 // WithMetricseExposeEndpoint config expose endpoint
@@ -81,23 +87,23 @@ func WithMetricseExposeEndpoint(endpoint string) InterceptorOption {
 }
 
 // EnableGRPCClientMetrics config metrics system
-func EnableGRPCClientMetrics(b bool) InterceptorOption {
-	return func (i *interceptorOptions) { i.metrics.grpceCient = b }
+func EnableGRPCClientMetrics() InterceptorOption {
+	return func (i *interceptorOptions) { i.metrics.grpceCient = true }
 }
 
 // EnableGRPCServerMetrics config metrics system
-func EnableGRPCServerMetrics(b bool) InterceptorOption {
-	return func (i *interceptorOptions) { i.metrics.grpcServer = b }
+func EnableGRPCServerMetrics() InterceptorOption {
+	return func (i *interceptorOptions) { i.metrics.grpcServer = true }
 }
 
 // EnableHTTPClientMetrics config metrics system
-func EnableHTTPClientMetrics(b bool) InterceptorOption {
-	return func (i *interceptorOptions) { i.metrics.httpClient = b }
+func EnableHTTPClientMetrics() InterceptorOption {
+	return func (i *interceptorOptions) { i.metrics.httpClient = true }
 }
 
 // EnableHTTPServerMetrics config metrics system
-func EnableHTTPServerMetrics(b bool) InterceptorOption {
-	return func (i *interceptorOptions) { i.metrics.httpServer = b }
+func EnableHTTPServerMetrics() InterceptorOption {
+	return func (i *interceptorOptions) { i.metrics.httpServer = true }
 }
 
 // WithMetricsListenPort config metrics http server listen port
@@ -112,20 +118,26 @@ func NewInterceptorClient(ctx context.Context, options ...InterceptorOption) (*I
 		option(intercepOptions)
 	}
 
+	if len(intercepOptions.project) == 0 {
+		return nil, fmt.Errorf("the project name must be provided")
+	}
+
 	client := &InterceptorClient{}
 	
-	if len(intercepOptions.tracing.projectID) > 0 {
-		traceClient, err := trace.NewClient(ctx, intercepOptions.tracing.projectID)
+	if intercepOptions.tracing.collector != nil {
+		traceClient, err := trace.NewClient(ctx, intercepOptions.project)
 		if err != nil {
 			log.Printf("create trace client failed:%s", err.Error())
 			return nil, err
 		}
-		traceClient.SetSamplingPolicy(intercepOptions.tracing.policy)
+		if intercepOptions.tracing.policy != nil {
+			traceClient.SetSamplingPolicy(intercepOptions.tracing.policy)
+		}
 		traceClient.SetCollector(intercepOptions.tracing.collector)
 		client.trace = traceClient
-		log.Printf("enable tracing for project:%s", intercepOptions.tracing.projectID)
+		log.Printf("enable tracing for project:%s", intercepOptions.project)
 	} else {
-		log.Println("no project id, so tracing disabled")
+		log.Println("no tracing collector, so logging disabled")
 	}
 
 	if intercepOptions.logging.entry != nil {
@@ -135,36 +147,32 @@ func NewInterceptorClient(ctx context.Context, options ...InterceptorOption) (*I
 			return nil, err
 		}
 		client.log = logClient
-		log.Printf("enable logging for project:%s", intercepOptions.tracing.projectID)
+		log.Printf("enable logging for project:%s", intercepOptions.project)
 	} else {
 		log.Println("no log entry, so logging disabled")
 	}
 	
-	if len(intercepOptions.metrics.projectID) > 0 {
-		if intercepOptions.metrics.grpceCient {
-			client.grpcClientMetrics = prometheus.NewGRPCClientPrometheus(intercepOptions.metrics.projectID)
-			client.grpcClientMetrics.RegisterHttpHandler(intercepOptions.metrics.exposeEp)
-		}
-
-		if intercepOptions.metrics.grpcServer {
-			client.grpcServerMetrics = prometheus.NewGRPCServerPrometheus(intercepOptions.metrics.projectID)
-			client.grpcServerMetrics.RegisterHttpHandler(intercepOptions.metrics.exposeEp)
-		}
-
-		if intercepOptions.metrics.httpClient {
-			client.httpClientMetrics = prometheus.NewHTTPClientPrometheus(intercepOptions.metrics.projectID)
-			client.grpcServerMetrics.RegisterHttpHandler(intercepOptions.metrics.exposeEp)
-		}
-
-		if intercepOptions.metrics.httpServer {
-			client.httpServerMetrics = prometheus.NewHTTPServerPrometheus(intercepOptions.metrics.projectID)
-			client.httpServerMetrics.RegisterHttpHandler(intercepOptions.metrics.exposeEp)
-		}
-		client.metrcsHttpServer = metrics.StartPrometheusMetricsHTTPServer(intercepOptions.metrics.listenPort)
-		log.Printf("enable metrics for project:%s", intercepOptions.tracing.projectID)
-	} else {
-		log.Println("no project id, so metrecs disabled")
+	if intercepOptions.metrics.grpceCient {
+		client.grpcClientMetrics = prometheus.NewGRPCClientPrometheus(intercepOptions.project)
+		client.grpcClientMetrics.RegisterHttpHandler(intercepOptions.metrics.exposeEp)
 	}
+
+	if intercepOptions.metrics.grpcServer {
+		client.grpcServerMetrics = prometheus.NewGRPCServerPrometheus(intercepOptions.project)
+		client.grpcServerMetrics.RegisterHttpHandler(intercepOptions.metrics.exposeEp)
+	}
+
+	if intercepOptions.metrics.httpClient {
+		client.httpClientMetrics = prometheus.NewHTTPClientPrometheus(intercepOptions.project)
+		client.grpcServerMetrics.RegisterHttpHandler(intercepOptions.metrics.exposeEp)
+	}
+
+	if intercepOptions.metrics.httpServer {
+		client.httpServerMetrics = prometheus.NewHTTPServerPrometheus(intercepOptions.project)
+		client.httpServerMetrics.RegisterHttpHandler(intercepOptions.metrics.exposeEp)
+	}
+	client.metrcsHttpServer = metrics.StartPrometheusMetricsHTTPServer(intercepOptions.metrics.listenPort)
+	log.Printf("enable metrics for project:%s", intercepOptions.project)
 
 	return client, nil
 }
