@@ -58,8 +58,8 @@ func WithProject(project string) InterceptorOption {
 	return func (i *interceptorOptions) { i.project = project }
 }
 
-// WithLogging config log system
-func WithLogging(level logging.LogLevel, entry *logrus.Entry) InterceptorOption {
+// EnableLogging config log system
+func EnableLogging(level logging.LogLevel, entry *logrus.Entry) InterceptorOption {
 	return func(i *interceptorOptions) { 
 		i.logging.level = level
 		i.logging.entry = entry
@@ -79,11 +79,6 @@ func EnableTracingWithDefaultSample(collector trace.Collector) InterceptorOption
 	return func (i *interceptorOptions) {		
 		i.tracing.collector = collector
 	}
-}
-
-// WithMetricseExposeEndpoint config expose endpoint
-func WithMetricseExposeEndpoint(endpoint string) InterceptorOption {
-	return func (i *interceptorOptions) { i.metrics.exposeEp = endpoint }
 }
 
 // EnableGRPCClientMetrics config metrics system
@@ -106,9 +101,12 @@ func EnableHTTPServerMetrics() InterceptorOption {
 	return func (i *interceptorOptions) { i.metrics.httpServer = true }
 }
 
-// WithMetricsListenPort config metrics http server listen port
-func WithMetricsListenPort(port int) InterceptorOption {
-	return func (i *interceptorOptions) { i.metrics.listenPort = port }
+// EnableMetricsExportServer config metrics http server listen port
+func EnableMetricsExportServer(port int, endpoint string) InterceptorOption {
+	return func (i *interceptorOptions) {
+		i.metrics.listenPort = port 
+		i.metrics.exposeEp = endpoint
+	}
 }
 
 // NewInterceptorClient create a new interceptor client
