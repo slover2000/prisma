@@ -25,8 +25,7 @@ const (
 // ClientMetrics represent a metrics client
 type ClientMetrics interface {
 	CounterGRPC(name string, duration time.Duration, err error)
-	CounterHTTP(req *http.Request, duration time.Duration, code int)
-	RegisterHttpHandler(endpoint string)
+	CounterHTTP(req *http.Request, duration time.Duration, code int)	
 	Close() error
 }
 

@@ -9,8 +9,7 @@ import (
 
 	m "github.com/slover2000/prisma/metrics"
 	"github.com/slover2000/prisma/utils"
-	prom "github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	prom "github.com/prometheus/client_golang/prometheus"	
 )
 
 const (
@@ -187,10 +186,6 @@ func (c *prometheusClient) CounterHTTP(req *http.Request, duration time.Duration
 		ms = 1
 	}
 	c.latencyHistogram.WithLabelValues(c.host, req.URL.Host, req.URL.Path, req.Method, fmt.Sprintf("%d", code)).Observe(float64(ms))
-}
-
-func (c *prometheusClient)RegisterHttpHandler(endpoint string) {
-	http.Handle(endpoint, promhttp.Handler())
 }
 
 func (c *prometheusClient) Close() error {

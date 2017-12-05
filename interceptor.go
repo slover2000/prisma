@@ -42,7 +42,6 @@ type tracingOptions struct {
 }
 
 type metricsOptions struct {
-	exposeEp	string
 	grpceCient	bool
 	grpcServer  bool
 	httpClient  bool
@@ -102,10 +101,9 @@ func EnableHTTPServerMetrics() InterceptorOption {
 }
 
 // EnableMetricsExportServer config metrics http server listen port
-func EnableMetricsExportServer(port int, endpoint string) InterceptorOption {
+func EnableMetricsExportServer(port int) InterceptorOption {
 	return func (i *interceptorOptions) {
 		i.metrics.listenPort = port 
-		i.metrics.exposeEp = endpoint
 	}
 }
 
@@ -152,22 +150,18 @@ func NewInterceptorClient(ctx context.Context, options ...InterceptorOption) (*I
 	
 	if intercepOptions.metrics.grpceCient {
 		client.grpcClientMetrics = prometheus.NewGRPCClientPrometheus(intercepOptions.project)
-		client.grpcClientMetrics.RegisterHttpHandler(intercepOptions.metrics.exposeEp)
 	}
 
 	if intercepOptions.metrics.grpcServer {
 		client.grpcServerMetrics = prometheus.NewGRPCServerPrometheus(intercepOptions.project)
-		client.grpcServerMetrics.RegisterHttpHandler(intercepOptions.metrics.exposeEp)
 	}
 
 	if intercepOptions.metrics.httpClient {
 		client.httpClientMetrics = prometheus.NewHTTPClientPrometheus(intercepOptions.project)
-		client.grpcServerMetrics.RegisterHttpHandler(intercepOptions.metrics.exposeEp)
 	}
 
 	if intercepOptions.metrics.httpServer {
 		client.httpServerMetrics = prometheus.NewHTTPServerPrometheus(intercepOptions.project)
-		client.httpServerMetrics.RegisterHttpHandler(intercepOptions.metrics.exposeEp)
 	}
 	client.metrcsHttpServer = metrics.StartPrometheusMetricsHTTPServer(intercepOptions.metrics.listenPort)
 	log.Printf("enable metrics for project:%s", intercepOptions.project)
