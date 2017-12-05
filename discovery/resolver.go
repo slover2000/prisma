@@ -185,7 +185,7 @@ func (w *etcdWatcher) Next() ([]*naming.Update, error) {
 	// check if is initialized
 	if !w.isInitialized {
 		// query addresses from etcd
-		ctx, cancel := context.WithTimeout(context.Background(), w.resolver.dialTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), w.resolver.fse)
 		resp, err := w.resolver.client.Get(ctx, prefix, clientv3.WithPrefix())
 		cancel()
 		if err == nil {

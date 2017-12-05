@@ -112,7 +112,7 @@ func (r *etcdRegister) Register() error {
         // minimum lease TTL is ttl-second
         resp, _ := c.client.Grant(context.TODO(), int64(c.options.ttl.Seconds()))
         leaseID := resp.ID
-        ctx, cancel := context.WithTimeout(context.Background(), c.options.dialTimeout * time.Second)
+        ctx, cancel := context.WithTimeout(context.Background(), c.options.dialTimeout)
         _, err := client.Put(ctx, serviceKey, string(endpointValue), clientv3.WithLease(leaseID))
         cancel()
         if err != nil {
@@ -137,7 +137,7 @@ func (r *etcdRegister) Register() error {
                     // reset the key
                     resp, _ := c.client.Grant(context.TODO(), int64(c.options.ttl.Seconds()))
                     leaseID = resp.ID
-                    ctx, cancel = context.WithTimeout(context.Background(), c.options.dialTimeout * time.Second)
+                    ctx, cancel = context.WithTimeout(context.Background(), c.options.dialTimeout)
                     _, err = client.Put(ctx, serviceKey, string(endpointValue), clientv3.WithLease(leaseID))
                     cancel()
                     if err != nil {
