@@ -99,19 +99,19 @@ type (
 	}
 	
 	JSONTraceData struct {
-		ProjectID 	string 	`json:project`
-		TraceID 	string	`json:trace`
-		Span		JSONSpanData `json:span`
+		ProjectID 	string 	`json:"project"`
+		TraceID 	string	`json:"trace"`
+		Span		JSONSpanData `json:"span"`
 	}
 	
 	JSONSpanData struct {
-		StartTime	int64	`json:starttime`
-		EndTime 	int64	`json:endtime`
-		Name 		string 	`json:name`
-		Kind 		string 	`json:kind`
-		SpanID 		uint64	`spanid`
-		ParentID	uint64	`parentid`
-		Labels		map[string]string	`labels`
+		StartTime	int64	`json:"starttime"`
+		EndTime 	int64	`json:"endtime"`
+		Name 		string 	`json:"name"`
+		Kind 		string 	`json:"kind"`
+		SpanID 		uint64	`json:"spanid"`
+		ParentID	uint64	`json:"parentid"`
+		Labels		map[string]string	`json:"labels"`
 	}
 )
 
