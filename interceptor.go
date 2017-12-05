@@ -169,9 +169,26 @@ func NewInterceptorClient(ctx context.Context, options ...InterceptorOption) (*I
 	return client, nil
 }
 
+// TraceClient return tracing client
+func (c *InterceptorClient) TraceClient() *trace.Client {
+	return c.trace
+}
+
+// LoggingClient return logging client
+func (c *InterceptorClient) LoggingClient() *logging.Client {
+	return c.log
+}
+
+// Close close interceptor client
+func (c *InterceptorClient) Close() {
+	if c.metrcsHttpServer != nil {
+		c.metrcsHttpServer.Shutdown()
+	}	
+}
+ 
 // CloseInterceptorClient close interceptor client
 func CloseInterceptorClient(c *InterceptorClient) {
 	if c.metrcsHttpServer != nil {
 		c.metrcsHttpServer.Shutdown()
 	}
-}
+} 
