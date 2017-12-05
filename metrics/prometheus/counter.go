@@ -168,7 +168,6 @@ func (c *prometheusClient) CounterGRPC(name string, duration time.Duration, err 
 	if ms == 0 {
 		ms = 1
 	}
-	duration.Nanoseconds()
 	c.latencyHistogram.WithLabelValues(c.host, serviceName, methodName, code.String()).Observe(float64(ms))
 }
 
