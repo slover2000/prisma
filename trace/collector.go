@@ -56,7 +56,7 @@ func (r *ConsoleCollector) Close() error {
 }
 
 func NewConsoleCollector() Collector {
-	return &ConsoleCollector{}
+	return &ConsoleCollector{encoder: NewTraceEncoder(JSONEncoderType)}
 }
 
 // MultiCollector implements Collector by sending spans to all collectors.
