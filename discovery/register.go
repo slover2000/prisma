@@ -113,7 +113,7 @@ func (r *etcdRegister) Register() error {
         resp, _ := c.client.Grant(context.TODO(), int64(c.options.ttl.Seconds()))
         leaseID := resp.ID
         ctx, cancel := context.WithTimeout(context.Background(), c.options.dialTimeout)
-        _, err := client.Put(ctx, serviceKey, string(endpointValue), clientv3.WithLease(leaseID))
+        _, err := c.client.Put(ctx, serviceKey, string(endpointValue), clientv3.WithLease(leaseID))
         cancel()
         if err != nil {
             log.Fatalf("grpclb: register service '%s' with ttl to etcd3 failed: %s", c.options.serviceName, err.Error())
@@ -129,7 +129,7 @@ func (r *etcdRegister) Register() error {
             case <-ticker.C:
                 // refresh set to true for not notifying the watcher
                 ctx, cancel := context.WithTimeout(context.Background(), c.options.dialTimeout)
-                _, err = client.KeepAliveOnce(ctx, leaseID)
+                _, err = c.client.KeepAliveOnce(ctx, leaseID)
                 cancel()
                 if err != nil {
                     log.Printf("grpclb: refresh service '%s' with ttl to etcd3 failed: %s", c.options.serviceName, err.Error())
@@ -138,7 +138,7 @@ func (r *etcdRegister) Register() error {
                     resp, _ := c.client.Grant(context.TODO(), int64(c.options.ttl.Seconds()))
                     leaseID = resp.ID
                     ctx, cancel = context.WithTimeout(context.Background(), c.options.dialTimeout)
-                    _, err = client.Put(ctx, serviceKey, string(endpointValue), clientv3.WithLease(leaseID))
+                    _, err = c.client.Put(ctx, serviceKey, string(endpointValue), clientv3.WithLease(leaseID))
                     cancel()
                     if err != nil {
                         log.Fatalf("grpclb: reregister service '%s' with ttl to etcd3 failed: %s", c.options.serviceName, err.Error())
@@ -158,7 +158,7 @@ func (r *etcdRegister) Unregister() error {
 
     addressValue := fmt.Sprintf("%s:%d", r.options.endpoint.Host, r.options.endpoint.Port)
     serviceKey = fmt.Sprintf("/%s/%s/%s/%s", r.options.systemName, r.options.serviceName, EnviormentTypeToString(r.options.endpoint.EnvType), addressValue)
-    _, err := client.Delete(context.Background(), serviceKey)
+    _, err := r.client.Delete(context.Background(), serviceKey)
     if err != nil {
         log.Printf("grpclb: unregister '%s' failed: %s", serviceKey, err.Error())
     } else {
