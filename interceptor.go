@@ -20,6 +20,7 @@ type InterceptorClient struct {
 	grpcServerMetrics   metrics.ClientMetrics
 	httpClientMetrics	metrics.ClientMetrics
 	httpServerMetrics	metrics.ClientMetrics
+	metrcsHttpServer	metrics.MetricsHttpServer
 }
 
 type interceptorOptions struct {
@@ -46,6 +47,7 @@ type metricsOptions struct {
 	grpcServer  bool
 	httpClient  bool
 	httpServer  bool
+	listenPort  int
 }
 
 // InterceptorOption represents a interceptor option
@@ -98,6 +100,11 @@ func EnableHTTPServerMetrics(b bool) InterceptorOption {
 	return func (i *interceptorOptions) { i.metrics.httpServer = b }
 }
 
+// WithMetricsListenPort config metrics http server listen port
+func WithMetricsListenPort(port int) InterceptorOption {
+	return func (i *interceptorOptions) { i.metrics.listenPort = port }
+}
+
 // NewInterceptorClient create a new interceptor client
 func NewInterceptorClient(ctx context.Context, options ...InterceptorOption) (*InterceptorClient, error) {
 	intercepOptions := &interceptorOptions{}
@@ -116,6 +123,9 @@ func NewInterceptorClient(ctx context.Context, options ...InterceptorOption) (*I
 		traceClient.SetSamplingPolicy(intercepOptions.tracing.policy)
 		traceClient.SetCollector(intercepOptions.tracing.collector)
 		client.trace = traceClient
+		log.Printf("enable tracing for project:%s", intercepOptions.tracing.projectID)
+	} else {
+		log.Println("no project id, so tracing disabled")
 	}
 
 	if intercepOptions.logging.entry != nil {
@@ -125,6 +135,9 @@ func NewInterceptorClient(ctx context.Context, options ...InterceptorOption) (*I
 			return nil, err
 		}
 		client.log = logClient
+		log.Printf("enable logging for project:%s", intercepOptions.tracing.projectID)
+	} else {
+		log.Println("no log entry, so logging disabled")
 	}
 	
 	if len(intercepOptions.metrics.projectID) > 0 {
@@ -147,7 +160,18 @@ func NewInterceptorClient(ctx context.Context, options ...InterceptorOption) (*I
 			client.httpServerMetrics = prometheus.NewHTTPServerPrometheus(intercepOptions.metrics.projectID)
 			client.httpServerMetrics.RegisterHttpHandler(intercepOptions.metrics.exposeEp)
 		}
+		client.metrcsHttpServer = metrics.StartPrometheusMetricsHTTPServer(intercepOptions.metrics.listenPort)
+		log.Printf("enable metrics for project:%s", intercepOptions.tracing.projectID)
+	} else {
+		log.Println("no project id, so metrecs disabled")
 	}
 
 	return client, nil
+}
+
+// CloseInterceptorClient close interceptor client
+func CloseInterceptorClient(c *InterceptorClient) {
+	if c.metrcsHttpServer != nil {
+		c.metrcsHttpServer.Shutdown()
+	}
 }
