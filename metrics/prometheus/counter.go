@@ -105,7 +105,7 @@ func NewHTTPClientPrometheus(project string) m.ClientMetrics {
 			prom.CounterOpts{
 				Name: fmt.Sprintf("%s_http_client_qps", project),
 				Help: fmt.Sprintf("%s: total number of http completed by the client, regardless of success or failure.", project),
-			}, []string{"host", "domain", "path", "code"}),
+			}, []string{"host", "domain", "path", "method", "code"}),
 
 		latencyHistogram: prom.NewHistogramVec(
 			prom.HistogramOpts{
@@ -113,7 +113,7 @@ func NewHTTPClientPrometheus(project string) m.ClientMetrics {
 				Help: fmt.Sprintf("%s: histogram of response latency (milliseconds) of the http until it is finished by the application.", project),
 				Buckets: prom.DefBuckets,
 			},
-			[]string{"host", "domain", "path", "code"},
+			[]string{"host", "domain", "path", "method", "code"},
 		),
 	}
 	prom.MustRegister(client.qpsCounter)
