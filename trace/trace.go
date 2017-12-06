@@ -227,6 +227,15 @@ func (c *Client) NewSpan(name string) *Span {
 	return c.newSpan(name, SpanKindUnspecified)
 }
 
+// NewServerKindSpan returns a new trace span with the given name or nil if the
+// client is nil.
+//
+// A new trace and span ID is generated to trace the span.
+// Returned span need to be finished by calling Finish or FinishWait.
+func (c *Client) NewServerKindSpan(name string) *Span {
+	return c.newSpan(name, SpanKindServer)
+}
+
 // NewClientKindSpan returns a new trace span with the given name or nil if the
 // client is nil.
 //
