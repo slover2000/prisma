@@ -99,7 +99,7 @@ type (
 	}
 	
 	JSONTraceData struct {
-		ProjectID 	string 	`json:"project"`
+		ServiceName	string 	`json:"service"`
 		TraceID 	string	`json:"trace"`
 		Span		JSONSpanData `json:"span"`
 	}
@@ -117,7 +117,7 @@ type (
 
 func (r *JSONEncoder) Encode(s *Span) []byte {
 	data := JSONTraceData{
-		ProjectID: s.trace.client.projectID,
+		ServiceName: s.trace.client.serviceName,
 		TraceID: s.TraceID(),
 		Span: JSONSpanData{
 			StartTime: s.StartTime(time.Microsecond),

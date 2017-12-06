@@ -26,24 +26,24 @@ type prometheusClient struct {
 // ClientMetrics when not using the default Prometheus metrics registry, for
 // example when wanting to control which metrics are added to a registry as
 // opposed to automatically adding metrics via init functions.
-func NewGRPCClientPrometheus(project string) m.ClientMetrics {
+func NewGRPCClientPrometheus() m.ClientMetrics {
 	client := &prometheusClient{
 		totalCounter: prom.NewCounterVec(
 			prom.CounterOpts{
-				Name: fmt.Sprintf("%s_grpc_request_total", project),
-				Help: fmt.Sprintf("%s: total number of RPCs completed by the client, regardless of success or failure.", project),
+				Name: "grpc_request_total",
+				Help: "Total number of RPCs completed by the client, regardless of success or failure.",
 			}, []string{"service", "method", "code"}),
 			
 		errorCounter: prom.NewCounterVec(
 			prom.CounterOpts{
-				Name: fmt.Sprintf("%s_grpc_request_failures_total", project),
-				Help: fmt.Sprintf("%s: total number of RPCs failed by the client.", project),
+				Name: "grpc_request_failures_total",
+				Help: "Total number of RPCs failed by the client.",
 			}, []string{"service", "method", "code"}),			
 
 		durationHistogram: prom.NewHistogramVec(
 			prom.HistogramOpts{
-				Name: fmt.Sprintf("%s_grpc_request_duration_ms", project),
-				Help: fmt.Sprintf("%s: histogram of response latency (milliseconds) of the gRPC until it is finished by the application.", project),
+				Name: "grpc_request_duration_ms",
+				Help: "Histogram of response latency (milliseconds) of the gRPC until it is finished by the application.",
 				Buckets: prom.DefBuckets,
 			},
 			[]string{"service", "method", "code"},
@@ -60,24 +60,24 @@ func NewGRPCClientPrometheus(project string) m.ClientMetrics {
 // ServerMetrics when not using the default Prometheus metrics registry, for
 // example when wanting to control which metrics are added to a registry as
 // opposed to automatically adding metrics via init functions.
-func NewGRPCServerPrometheus(project string) m.ClientMetrics {
+func NewGRPCServerPrometheus() m.ClientMetrics {
 	client := &prometheusClient{
 		totalCounter: prom.NewCounterVec(
 			prom.CounterOpts{
-				Name: fmt.Sprintf("%s_grpc_service_total", project),
-				Help: fmt.Sprintf("%s: total number of RPCs completed on the server, regardless of success or failure.", project),
+				Name: "grpc_handled_total",
+				Help: "Total number of RPCs completed on the server, regardless of success or failure.",
 			}, []string{"service", "method", "code"}),
 
 		errorCounter: prom.NewCounterVec(
 			prom.CounterOpts{
-				Name: fmt.Sprintf("%s_grpc_service_failures_total", project),
-				Help: fmt.Sprintf("%s: total number of RPCs failed by the client.", project),
+				Name: "grpc_handled_failures_total",
+				Help: "Total number of RPCs failed by the client.",
 			}, []string{"service", "method", "code"}),			
 
 		durationHistogram: prom.NewHistogramVec(
 			prom.HistogramOpts{
-				Name: fmt.Sprintf("%s_grpc_service_duration_ms", project),
-				Help: fmt.Sprintf("%s: histogram of response latency (seconds) of gRPC that had been application-level handled by the server.", project),
+				Name: "grpc_handled_duration_ms",
+				Help: "Histogram of response latency (seconds) of gRPC that had been application-level handled by the server.",
 				Buckets: prom.DefBuckets,
 			},
 			[]string{"service", "method", "code"},
@@ -91,24 +91,24 @@ func NewGRPCServerPrometheus(project string) m.ClientMetrics {
 }
 
 // NewHTTPClientPrometheus returns a ServerMetrics object.
-func NewHTTPClientPrometheus(project string) m.ClientMetrics {
+func NewHTTPClientPrometheus() m.ClientMetrics {
 	client := &prometheusClient{
 		totalCounter: prom.NewCounterVec(
 			prom.CounterOpts{
-				Name: fmt.Sprintf("%s_http_request_total", project),
-				Help: fmt.Sprintf("%s: total number of http completed by the client, regardless of success or failure.", project),
+				Name: "http_request_total",
+				Help: "Total number of http completed by the client, regardless of success or failure.",
 			}, []string{"domain", "path", "method", "code"}),
 
 		errorCounter: prom.NewCounterVec(
 			prom.CounterOpts{
-				Name: fmt.Sprintf("%s_http_request_failures_total", project),
-				Help: fmt.Sprintf("%s: total number of http failed by the client.", project),
+				Name: "http_request_failures_total",
+				Help: "Total number of http failed by the client.",
 			}, []string{"domain", "path", "method", "code"}),
 
 		durationHistogram: prom.NewHistogramVec(
 			prom.HistogramOpts{
-				Name: fmt.Sprintf("%s_http_request_duration_ms", project),
-				Help: fmt.Sprintf("%s: histogram of response latency (milliseconds) of the http until it is finished by the application.", project),
+				Name: "http_request_duration_ms",
+				Help: "Histogram of response latency (milliseconds) of the http until it is finished by the application.",
 				Buckets: prom.DefBuckets,
 			},
 			[]string{ "domain", "path", "method", "code"},
@@ -122,24 +122,24 @@ func NewHTTPClientPrometheus(project string) m.ClientMetrics {
 }
 
 // NewHTTPServerPrometheus returns a ServerMetrics object.
-func NewHTTPServerPrometheus(project string) m.ClientMetrics {
+func NewHTTPServerPrometheus() m.ClientMetrics {
 	client := &prometheusClient{
 		totalCounter: prom.NewCounterVec(
 			prom.CounterOpts{
-				Name: fmt.Sprintf("%s_http_service_total", project),
-				Help: fmt.Sprintf("%s: total number of http completed by the server, regardless of success or failure.", project),
+				Name: "http_handled_total",
+				Help: "Total number of http completed by the server, regardless of success or failure.",
 			}, []string{"domain", "path", "method", "code"}),
 
 		errorCounter: prom.NewCounterVec(
 			prom.CounterOpts{
-				Name: fmt.Sprintf("%s_http_service_failures_total", project),
-				Help: fmt.Sprintf("%s: total number of http failed by the server.", project),
+				Name: "http_handled_failures_total",
+				Help: "Total number of http failed by the server.",
 			}, []string{"domain", "path", "method", "code"}),			
 
 		durationHistogram: prom.NewHistogramVec(
 			prom.HistogramOpts{
-				Name: fmt.Sprintf("%s_http_service_duration_ms", project),
-				Help: fmt.Sprintf("%s: histogram of response latency (milliseconds) of the http until it is finished by the application.", project),
+				Name: "http_handled_duration_ms",
+				Help: "Histogram of response latency (milliseconds) of the http until it is finished by the application.",
 				Buckets: prom.DefBuckets,
 			},
 			[]string{"domain", "path", "method", "code"},

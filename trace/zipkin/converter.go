@@ -57,7 +57,7 @@ func ConvertToZipkinSpan(s *trace.Span) (*zipkincore.Span, error) {
 	}
 	ep := &zipkincore.Endpoint{
 		Ipv4: ip,
-		ServiceName: s.ProjectID(),
+		ServiceName: s.serviceName(),
 	}
 
 	kind := s.Kind()

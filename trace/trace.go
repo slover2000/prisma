@@ -85,16 +85,16 @@ func nextTraceID() string {
 // Client is a client for uploading traces to the Trace service.
 // A nil Client will no-op for all of its methods.
 type Client struct {
-	projectID 	string
+	serviceName 	string
 	policy    	SamplingPolicy
-	collector		Collector
+	collector   Collector
 }
 
 // NewClient creates a new Trace client.
-func NewClient(ctx context.Context, projectID string) (*Client, error) {
+func NewClient(ctx context.Context, serviceName string) (*Client, error) {
 	defaultPolicy, _ := NewLimitedSampler(defaultSampleRate, defaultMaxQPS)
 	c := &Client{
-		projectID: projectID,
+		serviceName: serviceName,
 		policy: defaultPolicy,
 		collector: NewNopCollector(),
 	}
@@ -468,12 +468,12 @@ func (s *Span) TraceID() string {
 }
 
 
-// ProjectID returns the ID of the project to which s belongs.
-func (s *Span) ProjectID() string {
+// serviceName returns the ID of the project to which s belongs.
+func (s *Span) serviceName() string {
 	if s == nil {
 		return ""
 	}
-	return s.trace.client.projectID
+	return s.trace.client.serviceName
 }
 
 func (s *Span) Client() *Client {
