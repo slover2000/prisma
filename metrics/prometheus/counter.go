@@ -16,6 +16,14 @@ const (
 	defaultReportInterval = 60
 )
 
+// defaultBuckets are the default Histogram buckets. The default buckets are
+// tailored to broadly measure the response time (in millisecond) of a network
+// service. Most likely, however, you will be required to define buckets
+// customized to your use case.
+var (
+	defaultBuckets = []float64{1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500., 1000.0, 2500.0, 5000.0, 10000.0}
+)
+
 type prometheusClient struct {
 	totalCounter       *prom.CounterVec
 	errorCounter       *prom.CounterVec		
@@ -44,7 +52,7 @@ func NewGRPCClientPrometheus() m.ClientMetrics {
 			prom.HistogramOpts{
 				Name: "grpc_request_duration_ms",
 				Help: "Histogram of response latency (milliseconds) of the gRPC until it is finished by the application.",
-				Buckets: prom.DefBuckets,
+				Buckets: defaultBuckets,
 			},
 			[]string{"service", "method", "code"},
 		),
@@ -78,7 +86,7 @@ func NewGRPCServerPrometheus() m.ClientMetrics {
 			prom.HistogramOpts{
 				Name: "grpc_handled_duration_ms",
 				Help: "Histogram of response latency (seconds) of gRPC that had been application-level handled by the server.",
-				Buckets: prom.DefBuckets,
+				Buckets: defaultBuckets,
 			},
 			[]string{"service", "method", "code"},
 		),
@@ -109,7 +117,7 @@ func NewHTTPClientPrometheus() m.ClientMetrics {
 			prom.HistogramOpts{
 				Name: "http_request_duration_ms",
 				Help: "Histogram of response latency (milliseconds) of the http until it is finished by the application.",
-				Buckets: prom.DefBuckets,
+				Buckets: defaultBuckets,
 			},
 			[]string{ "domain", "path", "method", "code"},
 		),
@@ -140,7 +148,7 @@ func NewHTTPServerPrometheus() m.ClientMetrics {
 			prom.HistogramOpts{
 				Name: "http_handled_duration_ms",
 				Help: "Histogram of response latency (milliseconds) of the http until it is finished by the application.",
-				Buckets: prom.DefBuckets,
+				Buckets: defaultBuckets,
 			},
 			[]string{"domain", "path", "method", "code"},
 		),
