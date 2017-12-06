@@ -47,7 +47,7 @@ type ConsoleCollector struct {
 }
 
 func (r *ConsoleCollector) Collect(span *Span) error {
-	fmt.Sprintln(string(r.encoder.Encode(span)))
+	fmt.Println(string(r.encoder.Encode(span)))
 	return nil
 }
 
