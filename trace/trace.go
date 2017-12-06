@@ -468,8 +468,8 @@ func (s *Span) TraceID() string {
 }
 
 
-// serviceName returns the ID of the project to which s belongs.
-func (s *Span) serviceName() string {
+// ServiceName returns the ID of the project to which s belongs.
+func (s *Span) ServiceName() string {
 	if s == nil {
 		return ""
 	}
