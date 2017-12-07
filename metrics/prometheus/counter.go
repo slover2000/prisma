@@ -34,7 +34,11 @@ type prometheusClient struct {
 // ClientMetrics when not using the default Prometheus metrics registry, for
 // example when wanting to control which metrics are added to a registry as
 // opposed to automatically adding metrics via init functions.
-func NewGRPCClientPrometheus() m.ClientMetrics {
+func NewGRPCClientPrometheus(buckets []float64) m.ClientMetrics {
+	if len(buckets) == 0 {
+		buckets = defaultBuckets
+	}
+
 	client := &prometheusClient{
 		totalCounter: prom.NewCounterVec(
 			prom.CounterOpts{
@@ -47,12 +51,12 @@ func NewGRPCClientPrometheus() m.ClientMetrics {
 				Name: "grpc_request_failures_total",
 				Help: "Total number of RPCs failed by the client.",
 			}, []string{"service", "method", "code"}),			
-
+		
 		durationHistogram: prom.NewHistogramVec(
 			prom.HistogramOpts{
 				Name: "grpc_request_duration_ms",
 				Help: "Histogram of response latency (milliseconds) of the gRPC until it is finished by the application.",
-				Buckets: defaultBuckets,
+				Buckets: buckets,
 			},
 			[]string{"service", "method", "code"},
 		),
@@ -68,7 +72,11 @@ func NewGRPCClientPrometheus() m.ClientMetrics {
 // ServerMetrics when not using the default Prometheus metrics registry, for
 // example when wanting to control which metrics are added to a registry as
 // opposed to automatically adding metrics via init functions.
-func NewGRPCServerPrometheus() m.ClientMetrics {
+func NewGRPCServerPrometheus(buckets []float64) m.ClientMetrics {
+	if len(buckets) == 0 {
+		buckets = defaultBuckets
+	}
+
 	client := &prometheusClient{
 		totalCounter: prom.NewCounterVec(
 			prom.CounterOpts{
@@ -86,7 +94,7 @@ func NewGRPCServerPrometheus() m.ClientMetrics {
 			prom.HistogramOpts{
 				Name: "grpc_handled_duration_ms",
 				Help: "Histogram of response latency (seconds) of gRPC that had been application-level handled by the server.",
-				Buckets: defaultBuckets,
+				Buckets: buckets,
 			},
 			[]string{"service", "method", "code"},
 		),
@@ -99,7 +107,11 @@ func NewGRPCServerPrometheus() m.ClientMetrics {
 }
 
 // NewHTTPClientPrometheus returns a ServerMetrics object.
-func NewHTTPClientPrometheus() m.ClientMetrics {
+func NewHTTPClientPrometheus(buckets []float64) m.ClientMetrics {
+	if len(buckets) == 0 {
+		buckets = defaultBuckets
+	}
+
 	client := &prometheusClient{
 		totalCounter: prom.NewCounterVec(
 			prom.CounterOpts{
@@ -117,7 +129,7 @@ func NewHTTPClientPrometheus() m.ClientMetrics {
 			prom.HistogramOpts{
 				Name: "http_request_duration_ms",
 				Help: "Histogram of response latency (milliseconds) of the http until it is finished by the application.",
-				Buckets: defaultBuckets,
+				Buckets: buckets,
 			},
 			[]string{ "domain", "path", "method", "code"},
 		),
@@ -130,7 +142,11 @@ func NewHTTPClientPrometheus() m.ClientMetrics {
 }
 
 // NewHTTPServerPrometheus returns a ServerMetrics object.
-func NewHTTPServerPrometheus() m.ClientMetrics {
+func NewHTTPServerPrometheus(buckets []float64) m.ClientMetrics {
+	if len(buckets) == 0 {
+		buckets = defaultBuckets
+	}
+
 	client := &prometheusClient{
 		totalCounter: prom.NewCounterVec(
 			prom.CounterOpts{
@@ -148,7 +164,7 @@ func NewHTTPServerPrometheus() m.ClientMetrics {
 			prom.HistogramOpts{
 				Name: "http_handled_duration_ms",
 				Help: "Histogram of response latency (milliseconds) of the http until it is finished by the application.",
-				Buckets: defaultBuckets,
+				Buckets: buckets,
 			},
 			[]string{"domain", "path", "method", "code"},
 		),

@@ -45,6 +45,7 @@ type metricsOptions struct {
 	grpcServer  bool
 	httpClient  bool
 	httpServer  bool
+	buckets     []float64
 	listenPort  int
 }
 
@@ -90,16 +91,17 @@ func EnableHTTPClientMetrics() InterceptorOption {
 	return func (i *interceptorOptions) { i.metrics.httpClient = true }
 }
 
-// EnableHTTPServerMetrics config metrics system
-func EnableHTTPServerMetrics() InterceptorOption {
-	return func (i *interceptorOptions) { i.metrics.httpServer = true }
+// EnableMetricsHTTPServer config metrics system
+func EnableMetricsHTTPServer(port int) InterceptorOption {
+	return func (i *interceptorOptions) { 
+		i.metrics.httpServer = true 
+		i.metrics.listenPort = port
+	}
 }
 
-// EnableMetricsExportServer config metrics http server listen port
-func EnableMetricsExportServer(port int) InterceptorOption {
-	return func (i *interceptorOptions) {
-		i.metrics.listenPort = port 
-	}
+// WithMetricsHistogramBuckets allows you to specify custom bucket ranges for histograms
+func WithMetricsHistogramBuckets(buckets []float64) InterceptorOption {
+	return func(i *interceptorOptions) { i.metrics.buckets = buckets }
 }
 
 // NewInterceptorClient create a new interceptor client
@@ -141,22 +143,22 @@ func NewInterceptorClient(ctx context.Context, options ...InterceptorOption) (*I
 	
 	enableAnyMetric := false
 	if intercepOptions.metrics.grpceCient {
-		client.grpcClientMetrics = prometheus.NewGRPCClientPrometheus()
+		client.grpcClientMetrics = prometheus.NewGRPCClientPrometheus(intercepOptions.metrics.buckets)
 		enableAnyMetric = true
 	}
 
 	if intercepOptions.metrics.grpcServer {
-		client.grpcServerMetrics = prometheus.NewGRPCServerPrometheus()
+		client.grpcServerMetrics = prometheus.NewGRPCServerPrometheus(intercepOptions.metrics.buckets)
 		enableAnyMetric = true
 	}
 
 	if intercepOptions.metrics.httpClient {
-		client.httpClientMetrics = prometheus.NewHTTPClientPrometheus()
+		client.httpClientMetrics = prometheus.NewHTTPClientPrometheus(intercepOptions.metrics.buckets)
 		enableAnyMetric = true
 	}
 
 	if intercepOptions.metrics.httpServer {
-		client.httpServerMetrics = prometheus.NewHTTPServerPrometheus()
+		client.httpServerMetrics = prometheus.NewHTTPServerPrometheus(intercepOptions.metrics.buckets)
 		enableAnyMetric = true
 	}
 

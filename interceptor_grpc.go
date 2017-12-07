@@ -251,7 +251,7 @@ func (c *InterceptorClient) GRPStreamServerInterceptor() grpc.StreamServerInterc
 		wrappedStream := wrapServerStream(stream)
 		wrappedStream.WrappedContext = ctx
 		startTime := time.Now()
-		err := handler(srv, stream)
+		err := handler(srv, wrappedStream)
 
 		// do metrics
 		c.grpcServerMetrics.CounterGRPC(info.FullMethod, time.Now().Sub(startTime), err)
