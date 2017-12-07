@@ -51,7 +51,7 @@ func (c *InterceptorClient) grpcUnaryInterceptor(ctx context.Context, method str
 	c.grpcClientMetrics.CounterGRPC(method, time.Now().Sub(startTime), err)
 
 	// log unary client grpc	
-	c.log.LogGrpcClientLine(outgoingCtx, method, span.Start(), err, fmt.Sprintf("finished grpc request %s", method))
+	c.log.LogGrpcClientLine(outgoingCtx, method, startTime, err, fmt.Sprintf("finished grpc request %s", method))
 	return err
 }
 
@@ -209,7 +209,7 @@ func (c *InterceptorClient) GRPCUnaryServerInterceptor() grpc.UnaryServerInterce
 		c.grpcServerMetrics.CounterGRPC(info.FullMethod, time.Now().Sub(startTime), err)
 
 		// log unary server grpc
-		c.log.LogGrpcClientLine(ctx, info.FullMethod, span.Start(), err, fmt.Sprintf("finished grpc service %s", info.FullMethod))
+		c.log.LogGrpcClientLine(ctx, info.FullMethod, startTime, err, fmt.Sprintf("finished grpc service %s", info.FullMethod))
 		return
 	}
 }
@@ -261,7 +261,7 @@ func (c *InterceptorClient) GRPStreamServerInterceptor() grpc.StreamServerInterc
 		c.grpcServerMetrics.CounterGRPC(info.FullMethod, time.Now().Sub(startTime), err)
 
 		// log stream server grpc
-		c.log.LogGrpcClientLine(ctx, info.FullMethod, span.Start(), err, fmt.Sprintf("finished grpc service %s", info.FullMethod))
+		c.log.LogGrpcClientLine(ctx, info.FullMethod, startTime, err, fmt.Sprintf("finished grpc service %s", info.FullMethod))
 		return err
 	}
 }

@@ -567,18 +567,30 @@ func (s *Span) Labels() map[string]string {
 }
 
 func (s *Span) Start() time.Time {
+	if s == nil {
+		return time.Now()
+	}	
 	return s.start
 }
 
 func (s *Span) StartTime(unit time.Duration) int64 {
+	if s == nil {
+		return 0
+	}	
 	return s.start.UnixNano() / int64(unit)
 }
 
 func (s *Span) End() time.Time {
+	if s == nil {
+		return time.Now()
+	}	
 	return s.end
 }
 
 func (s *Span) EndTime(unit time.Duration) int64 {
+	if s == nil {
+		return 0
+	}	
 	return s.end.UnixNano() / int64(unit)
 }
 

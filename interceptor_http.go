@@ -38,7 +38,7 @@ func (t Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	t.Client.httpClientMetrics.CounterHTTP(req, time.Now().Sub(startTime), statusCode)
 
 	// log request
-	t.Client.log.LogHttpClientLine(req, span.Start(), statusCode, fmt.Sprintf("%s finished.", req.URL.String()))
+	t.Client.log.LogHttpClientLine(req, startTime, statusCode, fmt.Sprintf("%s finished.", req.URL.String()))
 	return resp, err
 }
 
