@@ -170,7 +170,7 @@ func finishClientSpan(ctx context.Context, client *InterceptorClient, clientSpan
 	client.grpcClientMetrics.CounterGRPC(method, time.Now().Sub(startTime), logErr)
 
 	// log stream client grpc
-	client.log.LogGrpcClientLine(ctx, method, clientSpan.Start(), logErr, fmt.Sprintf("finished grpc request %s", method))
+	client.log.LogGrpcClientLine(ctx, method, startTime, logErr, fmt.Sprintf("finished grpc request %s", method))
 
 	if err != nil && err != io.EOF {
 		clientSpan.SetLabel(trace.LabelError, err.Error())
