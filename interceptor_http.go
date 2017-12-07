@@ -35,10 +35,14 @@ func (t Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	// do metrics
-	t.Client.httpClientMetrics.CounterHTTP(req, time.Now().Sub(startTime), statusCode)
+	if t.Client != nil && t.Client.httpClientMetrics != nil {
+		t.Client.httpClientMetrics.CounterHTTP(req, time.Now().Sub(startTime), statusCode)
+	}	
 
 	// log request
-	t.Client.log.LogHttpClientLine(req, startTime, statusCode, fmt.Sprintf("%s finished.", req.URL.String()))
+	if t.Client != nil && t.Client.log != nil {
+		t.Client.log.LogHttpClientLine(req, startTime, statusCode, fmt.Sprintf("%s finished.", req.URL.String()))	
+	}
 	return resp, err
 }
 
@@ -98,7 +102,10 @@ type handler struct {
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	span := h.client.trace.SpanFromRequestOrNot(r)
+	var span *trace.Span
+	if h.client != nil && h.client.trace != nil {
+		span = h.client.trace.SpanFromRequestOrNot(r)
+	}	
 	defer span.Finish()
 
 	r = r.WithContext(trace.NewContext(r.Context(), span))
@@ -113,5 +120,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.handler.ServeHTTP(rw, r)
 
 	// do metrics
-	h.client.httpServerMetrics.CounterHTTP(r, time.Now().Sub(startTime), rw.statusCode)
+	if h.client != nil && h.client.httpServerMetrics != nil {
+		h.client.httpServerMetrics.CounterHTTP(r, time.Now().Sub(startTime), rw.statusCode)
+	}
 }
