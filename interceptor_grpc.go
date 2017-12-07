@@ -72,10 +72,10 @@ func (c *InterceptorClient) GRPCStreamClientInterceptor() grpc.StreamClientInter
 		outgoingCtx := buildClientOutgoingContext(ctx, span)
 		clientStream, err := streamer(outgoingCtx, desc, cc, method, opts...)
 		if err != nil {		
-			finishClientSpan(outgoingCtx, c, span, time.Now(), err)
+			finishClientSpan(outgoingCtx, c, method, span, time.Now(), err)
 			return nil, err
 		}
-		return &tracedClientStream{ClientStream: clientStream, startTime: time.Now(), client: c, clientSpan: span}, nil
+		return &tracedClientStream{ClientStream: clientStream, method: method, startTime: time.Now(), client: c, clientSpan: span}, nil
 	}
 }
 
@@ -113,6 +113,7 @@ type tracedClientStream struct {
 	grpc.ClientStream
 	mu              	sync.Mutex
 	alreadyFinished 	bool
+	method              string
 	startTime			time.Time
 	client 				*InterceptorClient
 	clientSpan			*trace.Span
@@ -154,13 +155,12 @@ func (s *tracedClientStream) finishClientSpan(err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.alreadyFinished {
-		finishClientSpan(s.Context(), s.client, s.clientSpan, s.startTime, err)
+		finishClientSpan(s.Context(), s.client, s.method, s.clientSpan, s.startTime, err)
 		s.alreadyFinished = true
 	}
 }
 
-func finishClientSpan(ctx context.Context, client *InterceptorClient, clientSpan *trace.Span, startTime time.Time, err error) {	
-	method := clientSpan.Name()
+func finishClientSpan(ctx context.Context, client *InterceptorClient, method string, clientSpan *trace.Span, startTime time.Time, err error) {		
 	var logErr error
 	if err != nil && err != io.EOF {
 		logErr = err
