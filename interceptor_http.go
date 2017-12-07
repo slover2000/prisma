@@ -98,7 +98,7 @@ type handler struct {
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	span := h.client.trace.SpanFromRequest(r)
+	span := h.client.trace.SpanFromRequestOrNot(r)
 	defer span.Finish()
 
 	r = r.WithContext(trace.NewContext(r.Context(), span))

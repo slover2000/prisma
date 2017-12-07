@@ -96,7 +96,7 @@ func NewClient(ctx context.Context, serviceName string) (*Client, error) {
 	c := &Client{
 		serviceName: serviceName,
 		policy: defaultPolicy,
-		collector: NewNopCollector(),
+		collector: NewConsoleCollector(),
 	}
 	return c, nil
 }
@@ -218,6 +218,21 @@ func (c *Client) SpanFromRequest(r *http.Request) *Span {
 	return span
 }
 
+
+// SpanFromRequest returns a new trace span for an HTTP request or nil
+// if the client is nil or don't trace
+func (c *Client) SpanFromRequestOrNot(r *http.Request) *Span {
+	span := c.SpanFromRequest(r)
+	if span != nil {
+		if span.Traced() {
+			return span
+		}
+		return nil
+	}
+
+	return nil
+}
+
 // NewSpan returns a new trace span with the given name or nil if the
 // client is nil.
 //
@@ -227,13 +242,21 @@ func (c *Client) NewSpan(name string) *Span {
 	return c.newSpan(name, SpanKindUnspecified)
 }
 
-// NewServerKindSpan returns a new trace span with the given name or nil if the
-// client is nil.
+// NewClientKindSpanOrNot returns a new trace span with the given name or nil if the
+// client is nil or don't sample
 //
 // A new trace and span ID is generated to trace the span.
 // Returned span need to be finished by calling Finish or FinishWait.
-func (c *Client) NewServerKindSpan(name string) *Span {
-	return c.newSpan(name, SpanKindServer)
+func (c *Client) NewClientKindSpanOrNot(name string) *Span {
+	span := c.NewClientKindSpan(name)
+	if span != nil {
+		if span.Traced() {
+			return span
+		}
+		return nil
+	}
+
+	return nil
 }
 
 // NewClientKindSpan returns a new trace span with the given name or nil if the
@@ -249,6 +272,7 @@ func (c *Client) newSpan(name, kind string) *Span {
 	if c == nil {
 		return nil
 	}
+
 	t := &trace{
 		traceID:       nextTraceID(),
 		client:        c,

@@ -35,7 +35,7 @@ func (c *InterceptorClient) GRPCUnaryClientInterceptor() grpc.UnaryClientInterce
 func (c *InterceptorClient) grpcUnaryInterceptor(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 	span := trace.FromContext(ctx).NewChild(method)
 	if span == nil {
-		span = c.trace.NewClientKindSpan(method)
+		span = c.trace.NewClientKindSpanOrNot(method)
 	}
 	defer span.Finish()
 	
@@ -66,7 +66,7 @@ func (c *InterceptorClient) GRPCStreamClientInterceptor() grpc.StreamClientInter
 	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
 		span := trace.FromContext(ctx).NewChild(method)
 		if span == nil {
-			span = c.trace.NewClientKindSpan(method)
+			span = c.trace.NewClientKindSpanOrNot(method)
 		}
 
 		outgoingCtx := buildClientOutgoingContext(ctx, span)
@@ -80,6 +80,10 @@ func (c *InterceptorClient) GRPCStreamClientInterceptor() grpc.StreamClientInter
 }
 
 func buildClientOutgoingContext(parentCtx context.Context, span *trace.Span) context.Context {
+	if span == nil {
+		return parentCtx
+	}
+
 	// traceID is a hex-encoded 128-bit value.
 	// TODO(jbd): Decode trace IDs upon arrival and
 	// represent trace IDs with 16 bytes internally.
