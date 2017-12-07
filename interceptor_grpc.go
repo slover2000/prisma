@@ -135,19 +135,17 @@ func (s *tracedClientStream) SendMsg(m interface{}) error {
 	return err
 }
 
-func (s *tracedClientStream) CloseSend() error {
-	err := s.ClientStream.CloseSend()
+func (s *tracedClientStream) RecvMsg(m interface{}) error {
+	err := s.ClientStream.RecvMsg(m)
 	if err != nil {
 		s.finishClientSpan(err)
 	}
 	return err
 }
 
-func (s *tracedClientStream) RecvMsg(m interface{}) error {
-	err := s.ClientStream.RecvMsg(m)
-	if err != nil {
-		s.finishClientSpan(err)
-	}
+func (s *tracedClientStream) CloseSend() error {
+	err := s.ClientStream.CloseSend()
+	s.finishClientSpan(err)
 	return err
 }
 
