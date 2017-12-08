@@ -133,7 +133,6 @@ func (r *etcdRegister) Register() error {
                 cancel()
                 if err != nil {
                     log.Printf("refresh service '%s' with ttl to etcd3 failed: %s", c.options.serviceName, err.Error())
-                } else {
                     // reset the key
                     resp, _ := c.client.Grant(context.TODO(), int64(c.options.ttl.Seconds()))
                     leaseID = resp.ID
@@ -142,6 +141,8 @@ func (r *etcdRegister) Register() error {
                     cancel()
                     if err != nil {
                         log.Fatalf("reregister service '%s' with ttl to etcd3 failed: %s", c.options.serviceName, err.Error())
+                    } else {
+                        log.Printf("reset service '%s' to etcd3 successs", c.options.serviceName,)
                     }
                 }
             }
