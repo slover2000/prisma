@@ -91,10 +91,14 @@ func EnableHTTPClientMetrics() InterceptorOption {
 	return func (i *interceptorOptions) { i.metrics.httpClient = true }
 }
 
-// EnableMetricsHTTPServer config metrics system
-func EnableMetricsHTTPServer(port int) InterceptorOption {
+// EnableHTTPServerMetrics config metrics system
+func EnableHTTPServerMetrics() InterceptorOption {
+	return func (i *interceptorOptions) { i.metrics.httpServer = true }
+}
+
+// EnableMetricsExportHTTPServer config metrics system
+func EnableMetricsExportHTTPServer(port int) InterceptorOption {
 	return func (i *interceptorOptions) { 
-		i.metrics.httpServer = true 
 		i.metrics.listenPort = port
 	}
 }
