@@ -1,6 +1,7 @@
 package discovery
 
 // GRPCSystem is leading path of gprc service
+const HTTPSystem = "http"
 const GRPCSystem = "gprc"
 const RedisSystem = "redis"
 const MysqlSystem = "mysql"
