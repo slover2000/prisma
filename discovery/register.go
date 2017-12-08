@@ -93,7 +93,7 @@ func NewEtcdRegister(etcdAddr string, options ...RegisterOption) (EtcdRegister, 
     })
     
     if err != nil {
-        return nil, fmt.Errorf("grpclb: create etcd3 client failed: %v", err)
+        return nil, fmt.Errorf("create etcd3 client failed: %v", err)
     }
 
     register.client = client
@@ -116,7 +116,7 @@ func (r *etcdRegister) Register() error {
         _, err := c.client.Put(ctx, serviceKey, string(endpointValue), clientv3.WithLease(leaseID))
         cancel()
         if err != nil {
-            log.Fatalf("grpclb: register service '%s' with ttl to etcd3 failed: %s", c.options.serviceName, err.Error())
+            log.Fatalf("register service '%s' with ttl to etcd3 failed: %s", c.options.serviceName, err.Error())
             return
         }
 
@@ -132,7 +132,7 @@ func (r *etcdRegister) Register() error {
                 _, err = c.client.KeepAliveOnce(ctx, leaseID)
                 cancel()
                 if err != nil {
-                    log.Printf("grpclb: refresh service '%s' with ttl to etcd3 failed: %s", c.options.serviceName, err.Error())
+                    log.Printf("refresh service '%s' with ttl to etcd3 failed: %s", c.options.serviceName, err.Error())
                 } else {
                     // reset the key
                     resp, _ := c.client.Grant(context.TODO(), int64(c.options.ttl.Seconds()))
@@ -141,7 +141,7 @@ func (r *etcdRegister) Register() error {
                     _, err = c.client.Put(ctx, serviceKey, string(endpointValue), clientv3.WithLease(leaseID))
                     cancel()
                     if err != nil {
-                        log.Fatalf("grpclb: reregister service '%s' with ttl to etcd3 failed: %s", c.options.serviceName, err.Error())
+                        log.Fatalf("reregister service '%s' with ttl to etcd3 failed: %s", c.options.serviceName, err.Error())
                     }
                 }
             }
@@ -160,9 +160,9 @@ func (r *etcdRegister) Unregister() error {
     serviceKey = fmt.Sprintf("/%s/%s/%s/%s", r.options.systemName, r.options.serviceName, EnviormentTypeToString(r.options.endpoint.EnvType), addressValue)
     _, err := r.client.Delete(context.Background(), serviceKey)
     if err != nil {
-        log.Printf("grpclb: unregister '%s' failed: %s", serviceKey, err.Error())
+        log.Printf("unregister '%s' failed with: %s", serviceKey, err.Error())
     } else {
-        log.Printf("grpclb: unregister '%s' ok.", serviceKey)
+        log.Printf("unregister '%s' success", serviceKey)
     }
     
     return err
@@ -200,7 +200,7 @@ func RegisterWithEtcd(serviceName string, target string, ep Endpoint, interval, 
 		DialTimeout: 5 * time.Second,
 	})
 	if err != nil {
-        return fmt.Errorf("grpclb: create etcd3 client failed: %v", err)
+        return fmt.Errorf("create etcd3 client failed: %v", err)
     }
 
 	go func() {
@@ -214,7 +214,7 @@ func RegisterWithEtcd(serviceName string, target string, ep Endpoint, interval, 
         _, err = client.Put(ctx, serviceKey, string(endpointValue), clientv3.WithLease(leaseID))
         cancel()
         if err != nil {
-            log.Fatalf("grpclb: register service '%s' with ttl to etcd3 failed: %s", serviceName, err.Error())
+            log.Fatalf("register service '%s' with ttl to etcd3 failed: %s", serviceName, err.Error())
             return
         }
 
@@ -230,7 +230,7 @@ func RegisterWithEtcd(serviceName string, target string, ep Endpoint, interval, 
                 _, err = client.KeepAliveOnce(ctx, leaseID)
                 cancel()
                 if err != nil {
-                    log.Printf("grpclb: refresh service '%s' with ttl to etcd3 failed: %s", serviceName, err.Error())
+                    log.Printf("refresh service '%s' with ttl to etcd3 failed: %s", serviceName, err.Error())
                 }
             }
         }
@@ -247,9 +247,9 @@ func UnRegisterWithEtcd() error {
 
     var err error
     if _, err = client.Delete(context.Background(), serviceKey); err != nil {
-        log.Printf("grpclb: deregister '%s' failed: %s", serviceKey, err.Error())
+        log.Printf("deregister '%s' failed: %s", serviceKey, err.Error())
     } else {
-        log.Printf("grpclb: deregister '%s' ok.", serviceKey)
+        log.Printf("deregister '%s' ok.", serviceKey)
     }
     
     return err

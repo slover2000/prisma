@@ -71,7 +71,7 @@ func NewEtcdResolver(options ...ResolverOption) *etcdResolver {
 
 type Operation = string
 const (
-	Add			= "add"
+	Add		= "add"
 	Delete 	= "del"
 )
 
@@ -159,7 +159,7 @@ func (r *etcdResolver) Close() {
 // @Failure return error of etcd3
 func (r *etcdResolver) Resolve(target string) (naming.Watcher, error) {
 	if len(r.serviceName) == 0 {
-		return nil, errors.New("grpclb: no service name provided")
+		return nil, errors.New("no service name provided")
 	}
 
 	client, err := clientv3.New(clientv3.Config{
@@ -167,7 +167,7 @@ func (r *etcdResolver) Resolve(target string) (naming.Watcher, error) {
 		DialTimeout: r.dialTimeout,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("grpclb: creat etcd3 client failed: %s", err.Error())
+		return nil, fmt.Errorf("creat etcd3 client failed: %s", err.Error())
 	}
 	r.client = client
 	return &etcdWatcher{resolver: r}, nil
@@ -201,7 +201,7 @@ func (w *etcdWatcher) Next() ([]*naming.Update, error) {
 				return updates, nil
 			}
 		} else {
-			log.Printf("grpclb: get key with prefix[%s] failed:%s", prefix, err.Error())
+			log.Printf("get key with prefix[%s] failed:%s", prefix, err.Error())
 		}
 	}
 	// generate etcd Watcher
