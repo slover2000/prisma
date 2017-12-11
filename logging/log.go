@@ -109,9 +109,9 @@ func newHttpClientLoggerFields(req *http.Request) logrus.Fields {
 	url := req.URL.String()
 	method := req.Method
 	return logrus.Fields{
-		SystemField:    			"http",
-		KindField:      			trace.SpanKindClient,
-		trace.LabelHTTPURL: 	url,
+		SystemField:    	"http",
+		KindField:      	trace.SpanKindClient,
+		trace.LabelHTTPURL: url,
 		trace.LabelHTTPMethod:method,
 	}
 }
