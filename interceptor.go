@@ -53,11 +53,19 @@ type metricsOptions struct {
 // InterceptorOption represents a interceptor option
 type InterceptorOption func(*interceptorOptions)
 
-// EnableLogging config log system
-func EnableLogging(level logging.LogLevel, entry *logrus.Entry) InterceptorOption {
+// EnableLoggingWithEntry config log system
+func EnableLoggingWithEntry(level logging.LogLevel, entry *logrus.Entry) InterceptorOption {
 	return func(i *interceptorOptions) { 
 		i.logging.level = level
 		i.logging.entry = entry
+	}
+}
+
+// EnableLogging config log system
+func EnableLogging(level logging.LogLevel) InterceptorOption {
+	return func(i *interceptorOptions) { 
+		i.logging.level = level
+		i.logging.entry = logrus.NewEntry(logrus.StandardLogger())
 	}
 }
 
