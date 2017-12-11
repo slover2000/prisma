@@ -126,7 +126,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// log request
 	if h.client != nil && h.client.log != nil {
-		msg := fmt.Sprintf("%s %s %s %d", r.Method, r.URL.Path, r.Proto, rw.statusCode)
+		msg := fmt.Sprintf("%s %s %s %d", r.Method, r.URL.String(), r.Proto, rw.statusCode)
 		h.client.log.LogHttpServerLine(r, startTime, rw.statusCode, msg)
 	}
 }
