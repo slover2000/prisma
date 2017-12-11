@@ -16,24 +16,19 @@ import (
 const (
 	SystemField 		= "system"
 	KindField 			= "span.kind"
-	SpanKindClient      = `RPC_CLIENT`
-	SpanKindServer      = `RPC_SERVER`
-	RequestTime			= "request.time"
+	SpanKindClient      = `client`
+	SpanKindServer      = `server`
+	RequestTimeField    = "request.time"
+	MethodField         = "method"
+	DurationField       = "duration"
+	CodeField           = "code"
 	
-	GRPCServiceField	= "service"
-	GRPCMethodField		= "method"
-	GRPCCodeField		= "code"
-	GRPCDurationField	= "duration"
+	GRPCServiceField	= "service"		
 
-	HTTPHost           = `host`
-	HTTPMethod         = `method`
-	HTTPRedirectedURL  = `redirected_url`
-	HTTPRequestSize    = `request.size`
-	HTTPResponseSize   = `response.size`
-	HTTPStatusCode     = `status_code`
-	HTTPURL            = `url`
-	HTTPUserAgent      = `user_agent`
-	HTTPDuration       = `duration`	
+	HTTPHostField       = `host`	
+	HTTPRequestSizeField= `request.size`	
+	HTTPURLField        = `url`
+	HTTPUserAgentField  = `user_agent`	
 )
 
 type LogLevel = int
@@ -90,9 +85,9 @@ func (c *Client) LogGrpcClientLine(ctx context.Context, fullMethodString string,
 	if loglevelToLogusLevel(c.options.level) >= level {
 		durVal := time.Since(startTime)
 		fields := newGrpcClientLoggerFields(ctx, fullMethodString)
-		fields[RequestTime] = startTime.Format("2006-01-02 15:04:05")
-		fields[GRPCCodeField] = code.String()
-		fields[GRPCDurationField] = fmt.Sprintf("%d", converToMillisecond(durVal))
+		fields[RequestTimeField] = startTime.Format("2006-01-02 15:04:05")
+		fields[CodeField] = code.String()
+		fields[DurationField] = fmt.Sprintf("%d", converToMillisecond(durVal))
 		if err != nil {
 			fields[logrus.ErrorKey] = err
 		}
@@ -111,9 +106,9 @@ func (c *Client) LogGrpcServerLine(ctx context.Context, fullMethodString string,
 	if loglevelToLogusLevel(c.options.level) >= level {
 		durVal := time.Since(startTime)
 		fields := newGrpcServerLoggerFields(ctx, fullMethodString)
-		fields[RequestTime] = startTime.Format("2006-01-02 15:04:05")
-		fields[GRPCCodeField] = code.String()
-		fields[GRPCDurationField] = fmt.Sprintf("%d", converToMillisecond(durVal))
+		fields[RequestTimeField] = startTime.Format("2006-01-02 15:04:05")
+		fields[CodeField] = code.String()
+		fields[DurationField] = fmt.Sprintf("%d", converToMillisecond(durVal))
 		if err != nil {
 			fields[logrus.ErrorKey] = err
 		}
@@ -131,9 +126,9 @@ func (c *Client)LogHttpClientLine(req *http.Request, startTime time.Time, code i
 	if loglevelToLogusLevel(c.options.level) >= level {
 		durVal := time.Since(startTime)
 		fields := newHttpClientLoggerFields(req)
-		fields[RequestTime] = startTime.Format("2006-01-02 15:04:05")		
-		fields[HTTPStatusCode] = strconv.Itoa(code)
-		fields[GRPCDurationField] = fmt.Sprintf("%d", converToMillisecond(durVal))
+		fields[RequestTimeField] = startTime.Format("2006-01-02 15:04:05")		
+		fields[CodeField] = strconv.Itoa(code)
+		fields[DurationField] = fmt.Sprintf("%d", converToMillisecond(durVal))
 		logMessageWithLevel(c.options.entry.WithFields(fields), level, msg)
 	}
 }
@@ -146,9 +141,9 @@ func (c *Client)LogHttpServerLine(req *http.Request, startTime time.Time, code i
 	if loglevelToLogusLevel(c.options.level) >= level {
 		durVal := time.Since(startTime)
 		fields := newHttpServerLoggerFields(req)
-		fields[RequestTime] = startTime.Format("2006-01-02 15:04:05")
-		fields[HTTPStatusCode] = strconv.Itoa(code)
-		fields[GRPCDurationField] = fmt.Sprintf("%d", converToMillisecond(durVal))
+		fields[RequestTimeField] = startTime.Format("2006-01-02 15:04:05")
+		fields[CodeField] = strconv.Itoa(code)
+		fields[DurationField] = fmt.Sprintf("%d", converToMillisecond(durVal))
 		logMessageWithLevel(c.options.entry.WithFields(fields), level, msg)
 	}
 }
@@ -157,10 +152,10 @@ func newGrpcClientLoggerFields(ctx context.Context, fullMethodString string) log
 	service := path.Dir(fullMethodString)[1:]
 	method := path.Base(fullMethodString)
 	return logrus.Fields{
-		SystemField:    "grpc",
-		KindField:      SpanKindClient,
-		GRPCServiceField: service,
-		GRPCMethodField:  method,
+		SystemField:     "grpc",
+		KindField:       SpanKindClient,
+		GRPCServiceField:service,
+		MethodField:     method,
 	}
 }
 
@@ -168,10 +163,10 @@ func newGrpcServerLoggerFields(ctx context.Context, fullMethodString string) log
 	service := path.Dir(fullMethodString)[1:]
 	method := path.Base(fullMethodString)
 	return logrus.Fields{
-		SystemField:    "grpc",
-		KindField:      SpanKindServer,
-		GRPCServiceField: service,
-		GRPCMethodField:  method,
+		SystemField:     "grpc",
+		KindField:       SpanKindServer,
+		GRPCServiceField:service,
+		MethodField:     method,
 	}
 }
 
@@ -181,8 +176,8 @@ func newHttpClientLoggerFields(req *http.Request) logrus.Fields {
 	return logrus.Fields{
 		SystemField:    "http",
 		KindField:      SpanKindClient,
-		HTTPURL: url,
-		HTTPMethod:method,
+		HTTPURLField:   url,
+		MethodField:    method,
 	}
 }
 
@@ -193,18 +188,18 @@ func newHttpServerLoggerFields(req *http.Request) logrus.Fields {
 		return logrus.Fields{
 			SystemField:   	"http",
 			KindField:      SpanKindServer,
-			HTTPURL:        url,
-			HTTPMethod:     method,
-			HTTPUserAgent:  req.UserAgent(),
-			HTTPRequestSize:req.ContentLength,
+			HTTPURLField:   url,
+			MethodField:    method,
+			HTTPUserAgentField:  req.UserAgent(),
+			HTTPRequestSizeField:req.ContentLength,
 		}
 	} else {
 		return logrus.Fields{
 			SystemField:   	"http",
 			KindField:      SpanKindServer,
-			HTTPURL:        url,
-			HTTPMethod:     method,
-			HTTPUserAgent:  req.UserAgent(),			
+			HTTPURLField:   url,
+			MethodField:    method,
+			HTTPUserAgentField:  req.UserAgent(),			
 		}		
 	}
 }
