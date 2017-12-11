@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"fmt"
 	"time"
 	"path"
 	"strconv"
@@ -14,10 +15,11 @@ import (
 
 const (
 	SystemField 		= "system"
+	KindField 			= "span.kind"
 	SpanKindClient      = `RPC_CLIENT`
 	SpanKindServer      = `RPC_SERVER`
-
-	KindField 			= "span.kind"
+	RequestTime			= "request.time"
+	
 	GRPCServiceField	= "service"
 	GRPCMethodField		= "method"
 	GRPCCodeField		= "code"
@@ -31,7 +33,7 @@ const (
 	HTTPStatusCode     = `status_code`
 	HTTPURL            = `url`
 	HTTPUserAgent      = `user_agent`
-	HTTPDuration       = `duration`
+	HTTPDuration       = `duration`	
 )
 
 type LogLevel = int
@@ -70,6 +72,14 @@ func NewClient(level LogLevel, entry *logrus.Entry) (*Client, error) {
 	return client, nil
 }
 
+func converToMillisecond(duration time.Duration) int64 {
+	ms := duration.Nanoseconds() / int64(time.Millisecond)
+	if ms == 0 {
+		ms = 1
+	}
+	return ms
+}
+
 func (c *Client) LogGrpcClientLine(ctx context.Context, fullMethodString string, startTime time.Time, err error, msg string) {
 	if c == nil {
 		return
@@ -78,10 +88,11 @@ func (c *Client) LogGrpcClientLine(ctx context.Context, fullMethodString string,
 	code := grpc.Code(err)
 	level := grpcCodeToLogrusLevel(code)
 	if loglevelToLogusLevel(c.options.level) >= level {
-		durVal := time.Now().Sub(startTime)	
+		durVal := time.Since(startTime)
 		fields := newGrpcClientLoggerFields(ctx, fullMethodString)
+		fields[RequestTime] = startTime.Format("2017-01-02 15:04:05")
 		fields[GRPCCodeField] = code.String()
-		fields[GRPCDurationField] = durVal
+		fields[GRPCDurationField] = fmt.Sprintf("%d", converToMillisecond(durVal))
 		if err != nil {
 			fields[logrus.ErrorKey] = err
 		}
@@ -98,10 +109,11 @@ func (c *Client) LogGrpcServerLine(ctx context.Context, fullMethodString string,
 	code := grpc.Code(err)
 	level := grpcCodeToLogrusLevel(code)
 	if loglevelToLogusLevel(c.options.level) >= level {
-		durVal := time.Now().Sub(startTime)	
+		durVal := time.Since(startTime)
 		fields := newGrpcServerLoggerFields(ctx, fullMethodString)
+		fields[RequestTime] = startTime.Format("2017-01-02 15:04:05")
 		fields[GRPCCodeField] = code.String()
-		fields[GRPCDurationField] = durVal
+		fields[GRPCDurationField] = fmt.Sprintf("%d", converToMillisecond(durVal))
 		if err != nil {
 			fields[logrus.ErrorKey] = err
 		}
@@ -117,10 +129,11 @@ func (c *Client)LogHttpClientLine(req *http.Request, startTime time.Time, code i
 
 	level := httpCodeToLogrusLevel(code)
 	if loglevelToLogusLevel(c.options.level) >= level {
-		durVal := time.Now().Sub(startTime)	
+		durVal := time.Since(startTime)
 		fields := newHttpClientLoggerFields(req)
+		fields[RequestTime] = startTime.Format("2017-01-02 15:04:05")
 		fields[HTTPStatusCode] = strconv.Itoa(code)
-		fields[HTTPDuration] = durVal
+		fields[GRPCDurationField] = fmt.Sprintf("%d", converToMillisecond(durVal))
 		logMessageWithLevel(c.options.entry.WithFields(fields), level, msg)
 	}
 }
@@ -131,10 +144,11 @@ func (c *Client)LogHttpServerLine(req *http.Request, startTime time.Time, code i
 
 	level := httpCodeToLogrusLevel(code)
 	if loglevelToLogusLevel(c.options.level) >= level {
-		durVal := time.Now().Sub(startTime)	
+		durVal := time.Since(startTime)
 		fields := newHttpServerLoggerFields(req)
+		fields[RequestTime] = startTime.Format("2017-01-02 15:04:05")
 		fields[HTTPStatusCode] = strconv.Itoa(code)
-		fields[HTTPDuration] = durVal
+		fields[GRPCDurationField] = fmt.Sprintf("%d", converToMillisecond(durVal))
 		logMessageWithLevel(c.options.entry.WithFields(fields), level, msg)
 	}
 }

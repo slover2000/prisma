@@ -36,12 +36,13 @@ func (t Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	// do metrics
 	if t.Client != nil && t.Client.httpClientMetrics != nil {
-		t.Client.httpClientMetrics.CounterHTTP(req, time.Now().Sub(startTime), statusCode)
+		t.Client.httpClientMetrics.CounterHTTP(req, time.Since(startTime), statusCode)
 	}	
 
 	// log request
 	if t.Client != nil && t.Client.log != nil {
-		t.Client.log.LogHttpClientLine(req, startTime, statusCode, fmt.Sprintf("%s finished.", req.URL.String()))	
+		msg := fmt.Sprintf("request %s %s %d", req.Method, req.URL.String(), statusCode)
+		t.Client.log.LogHttpClientLine(req, startTime, statusCode, msg)	
 	}
 	return resp, err
 }
