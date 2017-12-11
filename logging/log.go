@@ -180,6 +180,7 @@ func newHttpServerLoggerFields(req *http.Request) logrus.Fields {
 		KindField:      SpanKindServer,
 		HTTPURL:        url,
 		HTTPMethod:     method,
+		HTTPUserAgent:  req.UserAgent(),
 		HTTPRequestSize:req.ContentLength,
 	}
 }
