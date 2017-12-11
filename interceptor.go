@@ -45,6 +45,7 @@ type metricsOptions struct {
 	grpcServer  bool
 	httpClient  bool
 	httpServer  bool
+	all			bool
 	buckets     []float64
 	listenPort  int
 }
@@ -95,6 +96,10 @@ func EnableHTTPClientMetrics() InterceptorOption {
 func EnableHTTPServerMetrics() InterceptorOption {
 	return func (i *interceptorOptions) { i.metrics.httpServer = true }
 }
+// EnableAllMetrics enable all metrics including http and grpc
+func EnableAllMetrics() InterceptorOption {
+	return func (i *interceptorOptions) { i.metrics.all = true }
+}
 
 // EnableMetricsExportHTTPServer config metrics system
 func EnableMetricsExportHTTPServer(port int) InterceptorOption {
@@ -144,7 +149,14 @@ func NewInterceptorClient(ctx context.Context, options ...InterceptorOption) (*I
 	} else {
 		log.Println("disable logging module")
 	}
-	
+		
+	if intercepOptions.metrics.all {
+		intercepOptions.metrics.grpceCient = true
+		intercepOptions.metrics.grpcServer = true
+		intercepOptions.metrics.httpClient = true
+		intercepOptions.metrics.httpServer = true
+	}
+
 	enableAnyMetric := false
 	if intercepOptions.metrics.grpceCient {
 		client.grpcClientMetrics = prometheus.NewGRPCClientPrometheus(intercepOptions.metrics.buckets)
