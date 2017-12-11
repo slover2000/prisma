@@ -51,7 +51,7 @@ func (c *InterceptorClient) grpcUnaryInterceptor(ctx context.Context, method str
 	c.grpcClientMetrics.CounterGRPC(method, time.Since(startTime), err)
 
 	// log unary client grpc	
-	msg := fmt.Sprintf("request %s %s", method, grpc.Code(err).String())
+	msg := fmt.Sprintf("unary %s %s", method, grpc.Code(err).String())
 	c.log.LogGrpcClientLine(outgoingCtx, method, startTime, err, msg)
 	return err
 }
@@ -169,7 +169,7 @@ func finishClientSpan(ctx context.Context, client *InterceptorClient, method str
 	client.grpcClientMetrics.CounterGRPC(method, time.Since(startTime), logErr)
 
 	// log stream client grpc
-	msg := fmt.Sprintf("request %s %s", method, grpc.Code(logErr).String())
+	msg := fmt.Sprintf("stream %s %s", method, grpc.Code(logErr).String())
 	client.log.LogGrpcClientLine(ctx, method, startTime, logErr, msg)
 
 	if err != nil && err != io.EOF {

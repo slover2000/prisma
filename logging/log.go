@@ -90,7 +90,7 @@ func (c *Client) LogGrpcClientLine(ctx context.Context, fullMethodString string,
 	if loglevelToLogusLevel(c.options.level) >= level {
 		durVal := time.Since(startTime)
 		fields := newGrpcClientLoggerFields(ctx, fullMethodString)
-		fields[RequestTime] = startTime.Format("2017-01-02 15:04:05")
+		fields[RequestTime] = startTime.Format("2006-01-02 15:04:05")
 		fields[GRPCCodeField] = code.String()
 		fields[GRPCDurationField] = fmt.Sprintf("%d", converToMillisecond(durVal))
 		if err != nil {
@@ -111,7 +111,7 @@ func (c *Client) LogGrpcServerLine(ctx context.Context, fullMethodString string,
 	if loglevelToLogusLevel(c.options.level) >= level {
 		durVal := time.Since(startTime)
 		fields := newGrpcServerLoggerFields(ctx, fullMethodString)
-		fields[RequestTime] = startTime.Format("2017-01-02 15:04:05")
+		fields[RequestTime] = startTime.Format("2006-01-02 15:04:05")
 		fields[GRPCCodeField] = code.String()
 		fields[GRPCDurationField] = fmt.Sprintf("%d", converToMillisecond(durVal))
 		if err != nil {
@@ -131,7 +131,7 @@ func (c *Client)LogHttpClientLine(req *http.Request, startTime time.Time, code i
 	if loglevelToLogusLevel(c.options.level) >= level {
 		durVal := time.Since(startTime)
 		fields := newHttpClientLoggerFields(req)
-		fields[RequestTime] = startTime.Format("2017-01-02 15:04:05")
+		fields[RequestTime] = startTime.Format("2006-01-02 15:04:05")		
 		fields[HTTPStatusCode] = strconv.Itoa(code)
 		fields[GRPCDurationField] = fmt.Sprintf("%d", converToMillisecond(durVal))
 		logMessageWithLevel(c.options.entry.WithFields(fields), level, msg)
@@ -146,7 +146,7 @@ func (c *Client)LogHttpServerLine(req *http.Request, startTime time.Time, code i
 	if loglevelToLogusLevel(c.options.level) >= level {
 		durVal := time.Since(startTime)
 		fields := newHttpServerLoggerFields(req)
-		fields[RequestTime] = startTime.Format("2017-01-02 15:04:05")
+		fields[RequestTime] = startTime.Format("2006-01-02 15:04:05")
 		fields[HTTPStatusCode] = strconv.Itoa(code)
 		fields[GRPCDurationField] = fmt.Sprintf("%d", converToMillisecond(durVal))
 		logMessageWithLevel(c.options.entry.WithFields(fields), level, msg)
@@ -189,13 +189,23 @@ func newHttpClientLoggerFields(req *http.Request) logrus.Fields {
 func newHttpServerLoggerFields(req *http.Request) logrus.Fields {
 	url := req.URL.String()
 	method := req.Method
-	return logrus.Fields{
-		SystemField:   	"http",
-		KindField:      SpanKindServer,
-		HTTPURL:        url,
-		HTTPMethod:     method,
-		HTTPUserAgent:  req.UserAgent(),
-		HTTPRequestSize:req.ContentLength,
+	if req.ContentLength > 0 {
+		return logrus.Fields{
+			SystemField:   	"http",
+			KindField:      SpanKindServer,
+			HTTPURL:        url,
+			HTTPMethod:     method,
+			HTTPUserAgent:  req.UserAgent(),
+			HTTPRequestSize:req.ContentLength,
+		}
+	} else {
+		return logrus.Fields{
+			SystemField:   	"http",
+			KindField:      SpanKindServer,
+			HTTPURL:        url,
+			HTTPMethod:     method,
+			HTTPUserAgent:  req.UserAgent(),			
+		}		
 	}
 }
 

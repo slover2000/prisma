@@ -41,7 +41,7 @@ func (t Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	// log request
 	if t.Client != nil && t.Client.log != nil {
-		msg := fmt.Sprintf("request %s %s %d", req.Method, req.URL.String(), statusCode)
+		msg := fmt.Sprintf("%s %s %s %d", req.Method, req.URL.String(), req.Proto, statusCode)
 		t.Client.log.LogHttpClientLine(req, startTime, statusCode, msg)	
 	}
 	return resp, err
@@ -119,6 +119,10 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rw := &withStatusCodeResponseWriter{writer: w}
 	startTime := time.Now()
 	h.handler.ServeHTTP(rw, r)
+
+	if rw.statusCode == 0 {
+		rw.statusCode = http.StatusOK
+	}	
 
 	// do metrics
 	if h.client != nil && h.client.httpServerMetrics != nil {
