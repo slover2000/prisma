@@ -10,17 +10,28 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-
-	"github.com/slover2000/prisma/trace"
 )
 
 const (
 	SystemField 		= "system"
+	SpanKindClient      = `RPC_CLIENT`
+	SpanKindServer      = `RPC_SERVER`
+
 	KindField 			= "span.kind"
 	GRPCServiceField	= "service"
 	GRPCMethodField		= "method"
 	GRPCCodeField		= "code"
 	GRPCDurationField	= "duration"
+
+	HTTPHost           = `host`
+	HTTPMethod         = `method`
+	HTTPRedirectedURL  = `redirected_url`
+	HTTPRequestSize    = `request.size`
+	HTTPResponseSize   = `response.size`
+	HTTPStatusCode     = `status_code`
+	HTTPURL            = `url`
+	HTTPUserAgent      = `user_agent`
+	HTTPDuration       = `duration`
 )
 
 type LogLevel = int
@@ -79,6 +90,26 @@ func (c *Client) LogGrpcClientLine(ctx context.Context, fullMethodString string,
 	}
 }
 
+func (c *Client) LogGrpcServerLine(ctx context.Context, fullMethodString string, startTime time.Time, err error, msg string) {
+	if c == nil {
+		return
+	}
+
+	code := grpc.Code(err)
+	level := grpcCodeToLogrusLevel(code)
+	if loglevelToLogusLevel(c.options.level) >= level {
+		durVal := time.Now().Sub(startTime)	
+		fields := newGrpcServerLoggerFields(ctx, fullMethodString)
+		fields[GRPCCodeField] = code.String()
+		fields[GRPCDurationField] = durVal
+		if err != nil {
+			fields[logrus.ErrorKey] = err
+		}
+	
+		logMessageWithLevel(c.options.entry.WithFields(fields), level, msg)	
+	}
+}
+
 func (c *Client)LogHttpClientLine(req *http.Request, startTime time.Time, code int, msg string) {
 	if c == nil {
 		return
@@ -88,8 +119,22 @@ func (c *Client)LogHttpClientLine(req *http.Request, startTime time.Time, code i
 	if loglevelToLogusLevel(c.options.level) >= level {
 		durVal := time.Now().Sub(startTime)	
 		fields := newHttpClientLoggerFields(req)
-		fields[trace.LabelHTTPStatusCode] = strconv.Itoa(code)
-		fields[trace.LabelHTTPDuration] = durVal
+		fields[HTTPStatusCode] = strconv.Itoa(code)
+		fields[HTTPDuration] = durVal
+		logMessageWithLevel(c.options.entry.WithFields(fields), level, msg)
+	}
+}
+func (c *Client)LogHttpServerLine(req *http.Request, startTime time.Time, code int, msg string) {
+	if c == nil {
+		return
+	}
+
+	level := httpCodeToLogrusLevel(code)
+	if loglevelToLogusLevel(c.options.level) >= level {
+		durVal := time.Now().Sub(startTime)	
+		fields := newHttpServerLoggerFields(req)
+		fields[HTTPStatusCode] = strconv.Itoa(code)
+		fields[HTTPDuration] = durVal
 		logMessageWithLevel(c.options.entry.WithFields(fields), level, msg)
 	}
 }
@@ -98,8 +143,19 @@ func newGrpcClientLoggerFields(ctx context.Context, fullMethodString string) log
 	service := path.Dir(fullMethodString)[1:]
 	method := path.Base(fullMethodString)
 	return logrus.Fields{
-		SystemField:    	"grpc",
-		KindField:      	trace.SpanKindClient,
+		SystemField:    "grpc",
+		KindField:      SpanKindClient,
+		GRPCServiceField: service,
+		GRPCMethodField:  method,
+	}
+}
+
+func newGrpcServerLoggerFields(ctx context.Context, fullMethodString string) logrus.Fields {
+	service := path.Dir(fullMethodString)[1:]
+	method := path.Base(fullMethodString)
+	return logrus.Fields{
+		SystemField:    "grpc",
+		KindField:      SpanKindServer,
 		GRPCServiceField: service,
 		GRPCMethodField:  method,
 	}
@@ -109,10 +165,22 @@ func newHttpClientLoggerFields(req *http.Request) logrus.Fields {
 	url := req.URL.String()
 	method := req.Method
 	return logrus.Fields{
-		SystemField:    	"http",
-		KindField:      	trace.SpanKindClient,
-		trace.LabelHTTPURL: url,
-		trace.LabelHTTPMethod:method,
+		SystemField:    "http",
+		KindField:      SpanKindClient,
+		HTTPURL: url,
+		HTTPMethod:method,
+	}
+}
+
+func newHttpServerLoggerFields(req *http.Request) logrus.Fields {
+	url := req.URL.String()
+	method := req.Method
+	return logrus.Fields{
+		SystemField:   	"http",
+		KindField:      SpanKindServer,
+		HTTPURL:        url,
+		HTTPMethod:     method,
+		HTTPRequestSize:req.ContentLength,
 	}
 }
 

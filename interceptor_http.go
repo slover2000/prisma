@@ -123,4 +123,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h.client != nil && h.client.httpServerMetrics != nil {
 		h.client.httpServerMetrics.CounterHTTP(r, time.Now().Sub(startTime), rw.statusCode)
 	}
+
+	// log request
+	if h.client != nil && h.client.log != nil {
+		//t.Client.log.LogHttpClientLine(req, startTime, statusCode, fmt.Sprintf("%s finished.", req.URL.String()))
+	}	
 }
