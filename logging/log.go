@@ -17,10 +17,10 @@ import (
 const (
 	SystemField 		= "system"
 	KindField 			= "span.kind"
-	GRPCServiceField	= "grpc.service"
-	GRPCMethodField		= "grpc.method"
-	GRPCCodeField		= "grpc.code"
-	GRPCDurationField	= "grpc.duration"
+	GRPCServiceField	= "service"
+	GRPCMethodField		= "method"
+	GRPCCodeField		= "code"
+	GRPCDurationField	= "duration"
 )
 
 type LogLevel = int
