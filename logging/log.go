@@ -276,7 +276,7 @@ func grpcCodeToLogrusLevel(code codes.Code) logrus.Level {
 func httpCodeToLogrusLevel(status int) logrus.Level {
 	if status > 200 {
 		return logrus.ErrorLevel
-	} else if status >= 200 && status <= 299 {
+	} else if status == 0 || (status >= 200 && status <= 299) {
 		return logrus.InfoLevel
 	} else {
 		return logrus.WarnLevel

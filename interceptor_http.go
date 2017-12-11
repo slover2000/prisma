@@ -122,7 +122,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// do metrics
 	if h.client != nil && h.client.httpServerMetrics != nil {
-		h.client.httpServerMetrics.CounterHTTP(r, time.Now().Sub(startTime), rw.statusCode)
+		h.client.httpServerMetrics.CounterHTTP(r, time.Since(startTime), rw.statusCode)
 	}
 
 	// log request
