@@ -68,6 +68,10 @@ func (c *perfcounterClient) CounterHTTP(req *http.Request, duration time.Duratio
 	}	
 }
 
+func (c *perfcounterClient) CounterDatabase(method string, duration time.Duration, err error) {
+
+}
+
 func (c *perfcounterClient) count(name string, count int64, err error) {
 	realName := makeMetricsName(name, meterSuffixName, err)
 	meter := metrics.GetOrRegisterMeter(realName, c.registry)

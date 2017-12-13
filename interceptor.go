@@ -2,6 +2,7 @@ package prisma
 
 import (
 	"log"
+	"sync"
 	
 	"golang.org/x/net/context"
 	"github.com/sirupsen/logrus"
@@ -12,6 +13,18 @@ import (
 	"github.com/slover2000/prisma/metrics/prometheus"
 )
 
+const (
+	MongoSystemName	= "mongo"
+	MysqlSystemName = "mysql"
+	RedisSystemName = "redis"
+	ElasticsearchSystemName = "elasticsearch"
+)
+
+var (
+	// std is the name of the standard InterceptorClient
+	std *InterceptorClient
+)
+
 // InterceptorClient a client for interceptor 
 type InterceptorClient struct {
 	trace				*trace.Client
@@ -20,7 +33,12 @@ type InterceptorClient struct {
 	grpcServerMetrics   metrics.ClientMetrics
 	httpClientMetrics	metrics.ClientMetrics
 	httpServerMetrics	metrics.ClientMetrics
+	wrapperMetrics		sync.Map
 	metrcsHttpServer	metrics.MetricsHttpServer
+}
+
+type wrapperSystemMetrics struct {
+	wrapperClient metrics.ClientMetrics
 }
 
 type interceptorOptions struct {
@@ -53,6 +71,10 @@ type metricsOptions struct {
 // InterceptorOption represents a interceptor option
 type InterceptorOption func(*interceptorOptions)
 
+func init() {
+	std = &InterceptorClient{}
+}
+
 // EnableLoggingWithEntry config log system
 func EnableLoggingWithEntry(level logging.LogLevel, entry *logrus.Entry) InterceptorOption {
 	return func(i *interceptorOptions) { 
@@ -79,8 +101,9 @@ func EnableTracing(serviceName string, policy trace.SamplingPolicy, collector tr
 }
 
 // EnableTracingWithDefaultSample config trace system
-func EnableTracingWithDefaultSample(collector trace.Collector) InterceptorOption {
-	return func (i *interceptorOptions) {		
+func EnableTracingWithDefaultSample(serviceName string, collector trace.Collector) InterceptorOption {
+	return func (i *interceptorOptions) {
+		i.tracing.service = serviceName
 		i.tracing.collector = collector
 	}
 }
@@ -121,6 +144,11 @@ func WithMetricsHistogramBuckets(buckets []float64) InterceptorOption {
 	return func(i *interceptorOptions) { i.metrics.buckets = buckets }
 }
 
+// StandardInterceptorClient return standard interceptor client of package
+func StandardInterceptorClient() *InterceptorClient {
+	return std
+}
+
 // NewInterceptorClient create a new interceptor client
 func NewInterceptorClient(ctx context.Context, options ...InterceptorOption) (*InterceptorClient, error) {
 	intercepOptions := &interceptorOptions{}
@@ -136,9 +164,7 @@ func NewInterceptorClient(ctx context.Context, options ...InterceptorOption) (*I
 			log.Printf("create trace client failed:%s", err.Error())
 			return nil, err
 		}
-		if intercepOptions.tracing.policy != nil {
-			traceClient.SetSamplingPolicy(intercepOptions.tracing.policy)
-		}
+		traceClient.SetSamplingPolicy(intercepOptions.tracing.policy)
 		traceClient.SetCollector(intercepOptions.tracing.collector)
 		client.trace = traceClient
 		log.Printf("enable tracing module for service:%s", intercepOptions.tracing.service)
@@ -206,11 +232,91 @@ func (c *InterceptorClient) LoggingClient() *logging.Client {
 	return c.log
 }
 
-// Close close interceptor client
+// Close interceptor client
 func (c *InterceptorClient) Close() {
 	if c.metrcsHttpServer != nil {
 		c.metrcsHttpServer.Shutdown()
 	}	
+}
+
+// EnableLoggingWithEntry config log system
+func (c *InterceptorClient) EnableLoggingWithEntry(level logging.LogLevel, entry *logrus.Entry) *InterceptorClient {
+	logClient, err := logging.NewClient(level, entry)
+	if err != nil {
+		log.Printf("create log client failed:%s", err.Error())
+		return c
+	}
+
+	log.Printf("enable logging module")
+	c.log = logClient
+	return c
+}
+
+// EnableLogging config log system
+func (c *InterceptorClient) EnableLogging(level logging.LogLevel) *InterceptorClient {
+	return c.EnableLoggingWithEntry(level, logrus.NewEntry(logrus.StandardLogger()))
+}
+
+// EnableTracing config trace system
+func (c *InterceptorClient) EnableTracing(serviceName string, policy trace.SamplingPolicy, collector trace.Collector) *InterceptorClient {
+	traceClient, err := trace.NewClient(context.Background(), serviceName)
+	if err != nil {
+		log.Printf("create trace client failed:%s", err.Error())
+		return c
+	}
+
+	traceClient.SetSamplingPolicy(policy)
+	traceClient.SetCollector(collector)
+	c.trace = traceClient
+	log.Printf("enable tracing module for service:%s", serviceName)
+	return c
+}
+
+// EnableTracingWithDefaultSample config trace system
+func (c *InterceptorClient) EnableTracingWithDefaultSample(serviceName string, collector trace.Collector) *InterceptorClient {
+	return c.EnableTracing(serviceName, nil, collector)
+}
+
+// EnableGRPCClientMetrics config metrics system
+func (c *InterceptorClient) EnableGRPCClientMetrics(buckets []float64) *InterceptorClient {
+	c.grpcClientMetrics = prometheus.NewGRPCClientPrometheus(buckets)
+	return c
+}
+
+// EnableGRPCServerMetrics config metrics system
+func (c *InterceptorClient) EnableGRPCServerMetrics(buckets []float64) *InterceptorClient {
+	c.grpcServerMetrics = prometheus.NewGRPCServerPrometheus(buckets)
+	return c
+}
+
+// EnableHTTPClientMetrics config metrics system
+func (c *InterceptorClient) EnableHTTPClientMetrics(buckets []float64) *InterceptorClient {
+	c.httpClientMetrics = prometheus.NewHTTPClientPrometheus(buckets)
+	return c
+}
+
+// EnableHTTPServerMetrics config metrics system
+func (c *InterceptorClient) EnableHTTPServerMetrics(buckets []float64) *InterceptorClient {
+	c.httpServerMetrics = prometheus.NewHTTPServerPrometheus(buckets)
+	return c
+}
+
+// EnableWrapperMetrics config metrics system
+func (c *InterceptorClient) EnableWrapperMetrics(buckets []float64) *InterceptorClient {
+	c.wrapperMetrics = prometheus.NewWrapperClientPrometheus(buckets)
+	return c
+}
+
+// EnableAllMetrics enable all metrics including http and grpc
+func (c *InterceptorClient) EnableAllMetrics(buckets []float64) *InterceptorClient {
+	return c.EnableGRPCClientMetrics(buckets).EnableGRPCServerMetrics(buckets).EnableHTTPClientMetrics(buckets).EnableHTTPServerMetrics(buckets).EnableWrapperMetrics(buckets)
+}
+
+// EnableMetricsExportHTTPServer config metrics system
+func (c *InterceptorClient) EnableMetricsExportHTTPServer(port int) *InterceptorClient {
+	c.metrcsHttpServer = metrics.StartPrometheusMetricsHTTPServer(port)
+	log.Printf("enable metrics module")
+	return c
 }
  
 // CloseInterceptorClient close interceptor client
@@ -218,4 +324,23 @@ func CloseInterceptorClient(c *InterceptorClient) {
 	if c.metrcsHttpServer != nil {
 		c.metrcsHttpServer.Shutdown()
 	}
-} 
+}
+
+
+type runFunc func() (interface{}, error)
+
+// Do runs your function in a synchronous manner, blocking until either your function succeeds
+// or an error is returned
+func (c *InterceptorClient) Do(ctx context.Context, method string, run runFunc) (interface{}, error) {
+	span := trace.FromContext(ctx).NewChild(method)
+	if span == nil {
+		span = c.trace.NewClientKindSpanOrNot(method)
+	}
+	defer span.Finish()
+
+	startTime := time.Now()
+	// do metrics
+	c.wrapperMetrics.CounterWrapper()
+
+
+}
