@@ -302,23 +302,44 @@ func (c *InterceptorClient) EnableHTTPServerMetrics(buckets []float64) *Intercep
 	return c
 }
 
-// Enable3rdDBMetrics enable thirdparty database metrics
-func (c *InterceptorClient) Enable3rdDBMetrics(system string, buckets []float64) *InterceptorClient {
+// Enable3rdDBMetricsWithBuckets enable thirdparty database metrics
+func (c *InterceptorClient) Enable3rdDBMetricsWithBuckets(system string, buckets []float64) *InterceptorClient {
 	databaseMetrics := prometheus.NewDatabaseClientPrometheus(system, buckets)
 	c.wrapperMetrics.Store(system, databaseMetrics)
 	return c
 }
 
-// Enable3rdCacheMetrics enable thirdparty cache metrics
-func (c *InterceptorClient) Enable3rdCacheMetrics(system string, buckets []float64) *InterceptorClient {
+// Enable3rdDBMetrics enable thirdparty database metrics
+func (c *InterceptorClient) Enable3rdDBMetrics(system string) *InterceptorClient {
+	databaseMetrics := prometheus.NewDatabaseClientPrometheus(system, nil)
+	c.wrapperMetrics.Store(system, databaseMetrics)
+	return c
+}
+
+// Enable3rdCacheMetricsWithBuckets enable thirdparty cache metrics
+func (c *InterceptorClient) Enable3rdCacheMetricsWithBuckets(system string, buckets []float64) *InterceptorClient {
 	cacheMetrics := prometheus.NewCacheClientPrometheus(system, buckets)
 	c.wrapperMetrics.Store(system, cacheMetrics)
 	return c
 }
 
-// Enable3rdSearchMetrics enable thirdparty cache metrics
-func (c *InterceptorClient) Enable3rdSearchMetrics(system string, buckets []float64) *InterceptorClient {
+// Enable3rdCacheMetrics enable thirdparty cache metrics
+func (c *InterceptorClient) Enable3rdCacheMetrics(system string) *InterceptorClient {
+	cacheMetrics := prometheus.NewCacheClientPrometheus(system, nil)
+	c.wrapperMetrics.Store(system, cacheMetrics)
+	return c
+}
+
+// Enable3rdSearchMetricsWithBuckets enable thirdparty cache metrics
+func (c *InterceptorClient) Enable3rdSearchMetricsWithBuckets(system string, buckets []float64) *InterceptorClient {
 	searchMetrics := prometheus.NewSearchClientPrometheus(system, buckets)
+	c.wrapperMetrics.Store(system, searchMetrics)
+	return c
+}
+
+// Enable3rdSearchMetrics enable thirdparty cache metrics
+func (c *InterceptorClient) Enable3rdSearchMetrics(system string) *InterceptorClient {
+	searchMetrics := prometheus.NewSearchClientPrometheus(system, nil)
 	c.wrapperMetrics.Store(system, searchMetrics)
 	return c
 }
