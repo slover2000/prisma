@@ -61,6 +61,43 @@ func JoinContextValue(ctx context.Context, values ...string) context.Context {
 	return context.WithValue(ctx, interceptorKey{}, strings.Join(values, colonSep))
 }
 
+// JoinDatabaseContextValue returns a derived context containing the mongo values.
+func JoinDatabaseContextValue(ctx context.Context, system, db, table, action, sql string) context.Context {
+	values := make([]string, 4)
+	values[SystemFieldIndex] = system
+	values[DBFieldIndex] = db
+	values[TableFieldIndex] = table
+	values[ActionFieldIndex] = action
+	if len(sql) != 0 {
+		values = append(values, sql)
+	}
+	return context.WithValue(ctx, interceptorKey{}, strings.Join(values, colonSep))
+}
+
+// JoinCacheContextValue returns a derived context containing the mongo values.
+func JoinCacheContextValue(ctx context.Context, system, action, command string) context.Context {
+	values := make([]string, 2)
+	values[SystemFieldIndex] = system
+	values[CacheActionFieldIndex] = action
+	if len(command) != 0 {
+		values = append(values, command)
+	}
+	return context.WithValue(ctx, interceptorKey{}, strings.Join(values, colonSep))
+}
+
+// JoinSearchContextValue returns a derived context containing the mongo values.
+func JoinSearchContextValue(ctx context.Context, system, index, document, action, command string) context.Context {
+	values := make([]string, 4)
+	values[SystemFieldIndex] = system
+	values[SearchIndexFieldIndex] = index
+	values[SearchDocumentFieldIndex] = document
+	values[SearchActionFieldIndex] = action
+	if len(command) != 0 {
+		values = append(values, command)
+	}
+	return context.WithValue(ctx, interceptorKey{}, strings.Join(values, colonSep))
+}
+
 // parseContextValue parse string
 func parseContextValue(ctx context.Context) ([]string, bool) {
 	if s, ok := ctx.Value(interceptorKey{}).(string); ok {
