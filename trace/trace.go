@@ -12,6 +12,8 @@ import (
 	"encoding/binary"	
 
 	"golang.org/x/net/context"
+
+	p "github.com/slover2000/prisma/thirdparty"
 )
 
 const (
@@ -41,6 +43,13 @@ const (
 	LabelSamplingPolicy     = `sampling_policy`
 	LabelSamplingWeight     = `sampling_weight`
 	LabelStackTrace         = `stacktrace`
+	LabelSystem 			= "system"
+	LabelDatabase			= `database`
+	LabelTable				= `table`
+	LabelSQL				= `sql`
+	LabelIndex            	= `index`
+	LabelDocument          	= `document`
+	LabelCommand            = `command`
 	LabelTID                = `tid`
 	LabelError 				= "error"
 )
@@ -442,6 +451,44 @@ func (s *Span) NewRemoteChild(r *http.Request) *Span {
 	return newSpan
 }
 
+// NewDatabaseChild creates a new database span as a child of s.
+func (s *Span) NewDatabaseChild(p *p.DatabaseParam) *Span {
+	if s == nil {
+		return nil
+	}
+	
+	if !s.Traced() {		
+		return s
+	}
+
+	return startNewChildWithDatabaseParams(p, s.trace, s.spanID)
+}
+
+// NewCacheChild creates a new cache span as a child of s.
+func (s *Span) NewCacheChild(p *p.CacheParam) *Span {
+	if s == nil {
+		return nil
+	}
+	
+	if !s.Traced() {		
+		return s
+	}
+
+	return startNewChildWithCacheParams(p, s.trace, s.spanID)
+}
+
+// NewSearchChild creates a new cache span as a child of s.
+func (s *Span) NewSearchChild(p *p.SearchParam) *Span {
+	if s == nil {
+		return nil
+	}
+	
+	if !s.Traced() {		
+		return s
+	}
+
+	return startNewChildWithSearchParams(p, s.trace, s.spanID)
+}
 // Header returns the value of the X-Cloud-Trace-Context header that
 // should be used to propagate the span.  This is the inverse of
 // SpanFromHeader.
@@ -485,6 +532,70 @@ func startNewChild(name string, trace *trace, parentSpanID uint64) *Span {
 	// if trace.localOptions & optionStack != 0 {
 	// 	_ = runtime.Callers(1, newSpan.stack[:])
 	// }
+	return newSpan
+}
+
+func startNewChildWithDatabaseParams(params *p.DatabaseParam, trace *trace, parentSpanID uint64) *Span {	
+	spanID := nextSpanID()
+	for spanID == parentSpanID {
+		spanID = nextSpanID()
+	}
+	name := fmt.Sprintf("%s.%s", params.System, params.Action)
+	newSpan := &Span{
+		trace: trace,
+		name: name,
+		kind: SpanKindClient,
+		parentSpanID: parentSpanID,
+		spanID: spanID,
+		start: time.Now(),
+	}
+	newSpan.setLabelWithoutLock(LabelSystem, params.System)
+	newSpan.setLabelWithoutLock(LabelDatabase, params.Database)
+	newSpan.setLabelWithoutLock(LabelTable, params.Table)
+	newSpan.setLabelWithoutLock(LabelSQL, params.SQL)
+
+	return newSpan
+}
+
+func startNewChildWithCacheParams(params *p.CacheParam, trace *trace, parentSpanID uint64) *Span {	
+	spanID := nextSpanID()
+	for spanID == parentSpanID {
+		spanID = nextSpanID()
+	}
+	name := fmt.Sprintf("%s.%s", params.System, params.Action)
+	newSpan := &Span{
+		trace: trace,
+		name: name,
+		kind: SpanKindClient,
+		parentSpanID: parentSpanID,
+		spanID: spanID,
+		start: time.Now(),
+	}
+	newSpan.setLabelWithoutLock(LabelSystem, params.System)
+	newSpan.setLabelWithoutLock(LabelCommand, params.Command)
+
+	return newSpan
+}
+
+func startNewChildWithSearchParams(params *p.SearchParam, trace *trace, parentSpanID uint64) *Span {	
+	spanID := nextSpanID()
+	for spanID == parentSpanID {
+		spanID = nextSpanID()
+	}
+	name := fmt.Sprintf("%s.%s", params.System, params.Action)
+	newSpan := &Span{
+		trace: trace,
+		name: name,
+		kind: SpanKindClient,
+		parentSpanID: parentSpanID,
+		spanID: spanID,
+		start: time.Now(),
+	}
+	newSpan.setLabelWithoutLock(LabelSystem, params.System)
+	newSpan.setLabelWithoutLock(LabelIndex, params.Index)
+	newSpan.setLabelWithoutLock(LabelDocument, params.Document)
+	newSpan.setLabelWithoutLock(LabelCommand, params.Command)
+
 	return newSpan
 }
 

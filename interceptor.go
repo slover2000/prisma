@@ -3,21 +3,23 @@ package prisma
 import (
 	"log"
 	"sync"
+	"time"
 	
 	"golang.org/x/net/context"
 	"github.com/sirupsen/logrus"
 
 	"github.com/slover2000/prisma/trace"
 	"github.com/slover2000/prisma/logging"
+	"github.com/slover2000/prisma/thirdparty"
 	"github.com/slover2000/prisma/metrics"
 	"github.com/slover2000/prisma/metrics/prometheus"
 )
 
 const (
-	MongoSystemName	= "mongo"
-	MysqlSystemName = "mysql"
-	RedisSystemName = "redis"
-	ElasticsearchSystemName = "elasticsearch"
+	MongoName	= "mongo"
+	MysqlName 	= "mysql"
+	RedisName 	= "redis"
+	ElasticsearchName = "elasticsearch"
 )
 
 var (
@@ -149,15 +151,14 @@ func StandardInterceptorClient() *InterceptorClient {
 	return std
 }
 
-// NewInterceptorClient create a new interceptor client
-func NewInterceptorClient(ctx context.Context, options ...InterceptorOption) (*InterceptorClient, error) {
+// ConfigInterceptorClient create a new interceptor client
+func ConfigInterceptorClient(ctx context.Context, options ...InterceptorOption) (*InterceptorClient, error) {
 	intercepOptions := &interceptorOptions{}
 	for _, option := range options {
 		option(intercepOptions)
 	}
 
-	client := &InterceptorClient{}
-
+	client := std
 	if len(intercepOptions.tracing.service) > 0 && intercepOptions.tracing.collector != nil {
 		traceClient, err := trace.NewClient(ctx, intercepOptions.tracing.service)
 		if err != nil {
@@ -301,15 +302,30 @@ func (c *InterceptorClient) EnableHTTPServerMetrics(buckets []float64) *Intercep
 	return c
 }
 
-// EnableWrapperMetrics config metrics system
-func (c *InterceptorClient) EnableWrapperMetrics(buckets []float64) *InterceptorClient {
-	c.wrapperMetrics = prometheus.NewWrapperClientPrometheus(buckets)
+// Enable3rdDBMetrics enable thirdparty database metrics
+func (c *InterceptorClient) Enable3rdDBMetrics(system string, buckets []float64) *InterceptorClient {
+	databaseMetrics := prometheus.NewDatabaseClientPrometheus(system, buckets)
+	c.wrapperMetrics.Store(system, databaseMetrics)
+	return c
+}
+
+// Enable3rdCacheMetrics enable thirdparty cache metrics
+func (c *InterceptorClient) Enable3rdCacheMetrics(system string, buckets []float64) *InterceptorClient {
+	cacheMetrics := prometheus.NewCacheClientPrometheus(system, buckets)
+	c.wrapperMetrics.Store(system, cacheMetrics)
+	return c
+}
+
+// Enable3rdSearchMetrics enable thirdparty cache metrics
+func (c *InterceptorClient) Enable3rdSearchMetrics(system string, buckets []float64) *InterceptorClient {
+	searchMetrics := prometheus.NewSearchClientPrometheus(system, buckets)
+	c.wrapperMetrics.Store(system, searchMetrics)
 	return c
 }
 
 // EnableAllMetrics enable all metrics including http and grpc
 func (c *InterceptorClient) EnableAllMetrics(buckets []float64) *InterceptorClient {
-	return c.EnableGRPCClientMetrics(buckets).EnableGRPCServerMetrics(buckets).EnableHTTPClientMetrics(buckets).EnableHTTPServerMetrics(buckets).EnableWrapperMetrics(buckets)
+	return c.EnableGRPCClientMetrics(buckets).EnableGRPCServerMetrics(buckets).EnableHTTPClientMetrics(buckets).EnableHTTPServerMetrics(buckets)
 }
 
 // EnableMetricsExportHTTPServer config metrics system
@@ -327,20 +343,90 @@ func CloseInterceptorClient(c *InterceptorClient) {
 }
 
 
+type actionResult struct{
+	value interface{}
+	err   error
+}
+
 type runFunc func() (interface{}, error)
 
-// Do runs your function in a synchronous manner, blocking until either your function succeeds
-// or an error is returned
-func (c *InterceptorClient) Do(ctx context.Context, method string, run runFunc) (interface{}, error) {
-	span := trace.FromContext(ctx).NewChild(method)
-	if span == nil {
-		span = c.trace.NewClientKindSpanOrNot(method)
+func (c *InterceptorClient) execute(ctx context.Context, f runFunc) (interface{}, error) {
+	done := make(chan actionResult, 1)
+	go func() {
+		result, err := f()
+		done <- actionResult{value: result, err: err}
+	}()
+	
+	select {
+	case result, _ := <-done:
+		return result.value, result.err
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
+}
+
+// DoDBAction runs your function in a synchronous manner, blocking until either your function succeeds
+// or an error is returned
+func (c *InterceptorClient) DoDBAction(ctx context.Context, f runFunc) (value interface{}, err error) {
+	params, ok := thirdparty.ParseDatabaeContextValue(ctx)
+	if !ok {		
+		return f()
+	}
+	
+	span := trace.FromContext(ctx).NewDatabaseChild(params)
 	defer span.Finish()
-
+	
 	startTime := time.Now()
+	value, err = c.execute(ctx, f)
 	// do metrics
-	c.wrapperMetrics.CounterWrapper()
+	if m, ok := c.wrapperMetrics.Load(params.System); ok {
+		metrics, _ := m.(metrics.ClientMetrics)
+		metrics.CounterDatabase(params, time.Since(startTime), err)
+	}
 
+	return
+}
 
+// DoCacheAction runs your function in a synchronous manner, blocking until either your function succeeds
+// or an error is returned
+func (c *InterceptorClient) DoCacheAction(ctx context.Context, f runFunc) (value interface{}, err error) {
+	params, ok := thirdparty.ParseCacheContextValue(ctx)
+	if !ok {		
+		return f()
+	}
+	
+	span := trace.FromContext(ctx).NewCacheChild(params)
+	defer span.Finish()
+	
+	startTime := time.Now()
+	value, err = c.execute(ctx, f)
+	// do metrics
+	if m, ok := c.wrapperMetrics.Load(params.System); ok {
+		metrics, _ := m.(metrics.ClientMetrics)
+		metrics.CounterCache(params, time.Since(startTime), err)
+	}
+
+	return
+}
+
+// DoSearchAction runs your function in a synchronous manner, blocking until either your function succeeds
+// or an error is returned
+func (c *InterceptorClient) DoSearchAction(ctx context.Context, f runFunc) (value interface{}, err error) {
+	params, ok := thirdparty.ParseSearchContextValue(ctx)
+	if !ok {		
+		return f()
+	}
+	
+	span := trace.FromContext(ctx).NewSearchChild(params)
+	defer span.Finish()
+	
+	startTime := time.Now()
+	value, err = c.execute(ctx, f)
+	// do metrics
+	if m, ok := c.wrapperMetrics.Load(params.System); ok {
+		metrics, _ := m.(metrics.ClientMetrics)
+		metrics.CounterSearch(params, time.Since(startTime), err)
+	}
+
+	return
 }

@@ -9,6 +9,8 @@ import (
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	p "github.com/slover2000/prisma/thirdparty"
 )
 
 type grpcType = string
@@ -26,7 +28,9 @@ const (
 type ClientMetrics interface {
 	CounterGRPC(name string, duration time.Duration, err error)
 	CounterHTTP(req *http.Request, duration time.Duration, code int)
-	CounterDatabase(method string, duration time.Duration, err error)
+	CounterDatabase(params *p.DatabaseParam, duration time.Duration, err error)
+	CounterCache(params *p.CacheParam, duration time.Duration, err error)
+	CounterSearch(params *p.SearchParam, duration time.Duration, err error)
 	Close() error
 }
 

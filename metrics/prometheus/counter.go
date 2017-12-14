@@ -8,16 +8,13 @@ import (
 	"google.golang.org/grpc"
 
 	m "github.com/slover2000/prisma/metrics"
+	p "github.com/slover2000/prisma/thirdparty"
 	prom "github.com/prometheus/client_golang/prometheus"	
 )
 
 const (
 	defaultProjectName	= "default_project"
 	defaultReportInterval = 60
-
-	databaseNameField	= "database"
-	endpointNameField 	= "endpoint"
-	tableNameField		= "table"	
 )
 
 // defaultBuckets are the default Histogram buckets. The default buckets are
@@ -219,6 +216,82 @@ func NewDatabaseClientPrometheus(system string, buckets []float64) m.ClientMetri
 	return client
 }
 
+// NewCacheClientPrometheus returns a ClientMetrics object. Use a new instance of
+// ClientMetrics when not using the default Prometheus metrics registry, for
+// example when wanting to control which metrics are added to a registry as
+// opposed to automatically adding metrics via init functions.
+func NewCacheClientPrometheus(system string, buckets []float64) m.ClientMetrics {
+	if len(buckets) == 0 {
+		buckets = defaultBuckets
+	}
+
+	client := &prometheusClient{
+		totalCounter: prom.NewCounterVec(
+			prom.CounterOpts{
+				Name: fmt.Sprintf("%s_request_total", system),
+				Help: fmt.Sprintf("Total number of request completed by the %s, regardless of success or failure.", system),
+			}, []string{"method", "error"}),
+			
+		errorCounter: prom.NewCounterVec(
+			prom.CounterOpts{
+				Name: fmt.Sprintf("%s_request_failures_total", system),
+				Help: fmt.Sprintf("Total number of request failed by the %s.", system),
+			}, []string{"method", "error"}),
+		
+		durationHistogram: prom.NewHistogramVec(
+			prom.HistogramOpts{
+				Name: fmt.Sprintf("%s_request_duration_ms", system),
+				Help: fmt.Sprintf("Histogram of response latency (milliseconds) of the request until it is finished by %s.", system),
+				Buckets: buckets,
+			},
+			[]string{"method", "error"},
+		),
+	}
+	prom.MustRegister(client.totalCounter)
+	prom.MustRegister(client.errorCounter)
+	prom.MustRegister(client.durationHistogram)
+
+	return client
+}
+
+// NewSearchClientPrometheus returns a ClientMetrics object. Use a new instance of
+// ClientMetrics when not using the default Prometheus metrics registry, for
+// example when wanting to control which metrics are added to a registry as
+// opposed to automatically adding metrics via init functions.
+func NewSearchClientPrometheus(system string, buckets []float64) m.ClientMetrics {
+	if len(buckets) == 0 {
+		buckets = defaultBuckets
+	}
+
+	client := &prometheusClient{
+		totalCounter: prom.NewCounterVec(
+			prom.CounterOpts{
+				Name: fmt.Sprintf("%s_request_total", system),
+				Help: fmt.Sprintf("Total number of request completed by the %s, regardless of success or failure.", system),
+			}, []string{"index", "document", "method", "error"}),
+			
+		errorCounter: prom.NewCounterVec(
+			prom.CounterOpts{
+				Name: fmt.Sprintf("%s_request_failures_total", system),
+				Help: fmt.Sprintf("Total number of request failed by the %s.", system),
+			}, []string{"index", "document", "method", "error"}),
+		
+		durationHistogram: prom.NewHistogramVec(
+			prom.HistogramOpts{
+				Name: fmt.Sprintf("%s_request_duration_ms", system),
+				Help: fmt.Sprintf("Histogram of response latency (milliseconds) of the request until it is finished by %s.", system),
+				Buckets: buckets,
+			},
+			[]string{"index", "document", "method", "error"},
+		),
+	}
+	prom.MustRegister(client.totalCounter)
+	prom.MustRegister(client.errorCounter)
+	prom.MustRegister(client.durationHistogram)
+
+	return client
+}
+
 func (c *prometheusClient) CounterGRPC(name string, duration time.Duration, err error) {
 	if c == nil {
 		return
@@ -264,7 +337,7 @@ func (c *prometheusClient) CounterHTTP(req *http.Request, duration time.Duration
 }
 
 
-func (c *prometheusClient) CounterDatabase(method string, duration time.Duration, err error) {
+func (c *prometheusClient) CounterDatabase(params *p.DatabaseParam, duration time.Duration, err error) {
 	if c == nil {
 		return
 	}
@@ -274,11 +347,11 @@ func (c *prometheusClient) CounterDatabase(method string, duration time.Duration
 	if err != nil {
 		errStr = err.Error()
 	}
-	c.totalCounter.WithLabelValues(service, method, errStr).Inc()
+	c.totalCounter.WithLabelValues(params.Database, params.Table, params.Action, errStr).Inc()
 
 	// 记录failurs counter
 	if err != nil {
-		c.errorCounter.WithLabelValues(service, method, errStr).Inc()
+		c.errorCounter.WithLabelValues(params.Database, params.Table, params.Action, errStr).Inc()
 	}
 
 	// 记录Histogram, in millisecond, measure cost time of every method
@@ -286,9 +359,59 @@ func (c *prometheusClient) CounterDatabase(method string, duration time.Duration
 	if ms == 0 {
 		ms = 1
 	}
-	c.durationHistogram.WithLabelValues(service, method, errStr).Observe(float64(ms))
+	c.durationHistogram.WithLabelValues(params.Database, params.Table, params.Action, errStr).Observe(float64(ms))
 }
 
 func (c *prometheusClient) Close() error {
 	return nil
+}
+
+func (c *prometheusClient) CounterCache(params *p.CacheParam, duration time.Duration, err error) {
+	if c == nil {
+		return
+	}
+
+	// 记录total counter, like QPS
+	errStr := ""
+	if err != nil {
+		errStr = err.Error()
+	}
+	c.totalCounter.WithLabelValues(params.Action, errStr).Inc()
+
+	// 记录failurs counter
+	if err != nil {
+		c.errorCounter.WithLabelValues(params.Action, errStr).Inc()
+	}
+
+	// 记录Histogram, in millisecond, measure cost time of every method
+	ms := duration.Nanoseconds() / int64(time.Millisecond)
+	if ms == 0 {
+		ms = 1
+	}
+	c.durationHistogram.WithLabelValues(params.Action, errStr).Observe(float64(ms))
+}
+
+func (c *prometheusClient) CounterSearch(params *p.SearchParam, duration time.Duration, err error) {
+	if c == nil {
+		return
+	}
+	
+	// 记录total counter, like QPS
+	errStr := ""
+	if err != nil {
+		errStr = err.Error()
+	}
+	c.totalCounter.WithLabelValues(params.Index, params.Document, params.Action, errStr).Inc()
+
+	// 记录failurs counter
+	if err != nil {
+		c.errorCounter.WithLabelValues(params.Index, params.Document, params.Action, errStr).Inc()
+	}
+
+	// 记录Histogram, in millisecond, measure cost time of every method
+	ms := duration.Nanoseconds() / int64(time.Millisecond)
+	if ms == 0 {
+		ms = 1
+	}
+	c.durationHistogram.WithLabelValues(params.Index, params.Document, params.Action, errStr).Observe(float64(ms))	
 }

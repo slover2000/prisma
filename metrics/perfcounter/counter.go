@@ -8,6 +8,7 @@ import (
 	"github.com/rcrowley/go-metrics"
 
 	m "github.com/slover2000/prisma/metrics"
+	p "github.com/slover2000/prisma/thirdparty"
 )
 
 const (
@@ -68,8 +69,16 @@ func (c *perfcounterClient) CounterHTTP(req *http.Request, duration time.Duratio
 	}	
 }
 
-func (c *perfcounterClient) CounterDatabase(method string, duration time.Duration, err error) {
+func (c *perfcounterClient) CounterDatabase(params *p.DatabaseParam, duration time.Duration, err error) {
 
+}
+
+func (c *perfcounterClient) CounterCache(params *p.CacheParam, duration time.Duration, err error) {
+	
+}
+
+func (c *perfcounterClient) CounterSearch(params *p.SearchParam, duration time.Duration, err error) {
+	
 }
 
 func (c *perfcounterClient) count(name string, count int64, err error) {
