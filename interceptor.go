@@ -370,11 +370,12 @@ type actionResult struct{
 }
 
 type runFunc func() (interface{}, error)
+type fallbackFunc func(error) (interface{}, error)
 
-func (c *InterceptorClient) execute(ctx context.Context, f runFunc) (interface{}, error) {
+func (c *InterceptorClient) execute(ctx context.Context, run runFunc, fallback fallbackFunc) (interface{}, error) {
 	done := make(chan actionResult, 1)
 	go func() {
-		result, err := f()
+		result, err := run()
 		done <- actionResult{value: result, err: err}
 	}()
 	
@@ -389,32 +390,38 @@ func (c *InterceptorClient) execute(ctx context.Context, f runFunc) (interface{}
 // Do runs your function in a synchronous manner, blocking until either your function succeeds
 // or an error is returned
 func (c *InterceptorClient) Do(ctx context.Context, run runFunc) (interface{}, error) {
+	return c.DoWithFallback(ctx, run, nil)
+}
+
+// DoWithFallback runs your function in a synchronous manner, blocking until either your function succeeds
+// or an error is returned
+func (c *InterceptorClient) DoWithFallback(ctx context.Context, run runFunc, fallback fallbackFunc) (interface{}, error) {
 	t := thirdparty.DetectContextValue(ctx)
 	switch t {
 	case thirdparty.TypeDatabaseSystem:
-		return c.doDBAction(ctx, run)
+		return c.doDBAction(ctx, run, fallback)
 	case thirdparty.TypeCacheSystem:
-		return c.doCacheAction(ctx, run)
+		return c.doCacheAction(ctx, run, fallback)
 	case thirdparty.TypeSearchSystem:
-		return c.doSearchAction(ctx, run)
+		return c.doSearchAction(ctx, run, fallback)
 	default:
-		return run()
+		return c.execute(ctx, run, fallback)
 	}
 }
 
 // doDBAction runs your function in a synchronous manner, blocking until either your function succeeds
 // or an error is returned
-func (c *InterceptorClient) doDBAction(ctx context.Context, f runFunc) (value interface{}, err error) {
+func (c *InterceptorClient) doDBAction(ctx context.Context, run runFunc, fallback fallbackFunc) (value interface{}, err error) {
 	params, ok := thirdparty.ParseDatabaeContextValue(ctx)
-	if !ok {		
-		return f()
+	if !ok {
+		return c.execute(ctx, run, fallback)
 	}
 	
 	span := trace.FromContext(ctx).NewDatabaseChild(params)
 	defer span.Finish()
 	
 	startTime := time.Now()
-	value, err = c.execute(ctx, f)
+	value, err = c.execute(ctx, run, fallback)
 	// do metrics
 	if m, ok := c.wrapperMetrics.Load(params.System); ok {
 		metrics, _ := m.(metrics.ClientMetrics)
@@ -426,17 +433,17 @@ func (c *InterceptorClient) doDBAction(ctx context.Context, f runFunc) (value in
 
 // doCacheAction runs your function in a synchronous manner, blocking until either your function succeeds
 // or an error is returned
-func (c *InterceptorClient) doCacheAction(ctx context.Context, f runFunc) (value interface{}, err error) {
+func (c *InterceptorClient) doCacheAction(ctx context.Context, run runFunc, fallback fallbackFunc) (value interface{}, err error) {
 	params, ok := thirdparty.ParseCacheContextValue(ctx)
 	if !ok {		
-		return f()
+		return c.execute(ctx, run, fallback)
 	}
 	
 	span := trace.FromContext(ctx).NewCacheChild(params)
 	defer span.Finish()
 	
 	startTime := time.Now()
-	value, err = c.execute(ctx, f)
+	value, err = c.execute(ctx, run, fallback)
 	// do metrics
 	if m, ok := c.wrapperMetrics.Load(params.System); ok {
 		metrics, _ := m.(metrics.ClientMetrics)
@@ -448,17 +455,17 @@ func (c *InterceptorClient) doCacheAction(ctx context.Context, f runFunc) (value
 
 // doSearchAction runs your function in a synchronous manner, blocking until either your function succeeds
 // or an error is returned
-func (c *InterceptorClient) doSearchAction(ctx context.Context, f runFunc) (value interface{}, err error) {
+func (c *InterceptorClient) doSearchAction(ctx context.Context, run runFunc, fallback fallbackFunc) (value interface{}, err error) {
 	params, ok := thirdparty.ParseSearchContextValue(ctx)
 	if !ok {		
-		return f()
+		return c.execute(ctx, run, fallback)
 	}
 	
 	span := trace.FromContext(ctx).NewSearchChild(params)
 	defer span.Finish()
 	
 	startTime := time.Now()
-	value, err = c.execute(ctx, f)
+	value, err = c.execute(ctx, run, fallback)
 	// do metrics
 	if m, ok := c.wrapperMetrics.Load(params.System); ok {
 		metrics, _ := m.(metrics.ClientMetrics)
