@@ -20,6 +20,8 @@ const (
 	MysqlName 	= "mysql"
 	RedisName 	= "redis"
 	ElasticsearchName = "elasticsearch"
+
+	defaultCircuitBreakerName = "default"
 )
 
 var (
@@ -37,6 +39,7 @@ type InterceptorClient struct {
 	httpServerMetrics	metrics.ClientMetrics
 	wrapperMetrics		sync.Map
 	metrcsHttpServer	metrics.MetricsHttpServer
+	circuitBreaker      bool
 }
 
 type wrapperSystemMetrics struct {
@@ -47,6 +50,7 @@ type interceptorOptions struct {
 	tracing		tracingOptions
 	logging		loggingOptions
 	metrics     metricsOptions
+	circuitBreaker      bool
 }
 
 type loggingOptions struct {
@@ -146,6 +150,13 @@ func WithMetricsHistogramBuckets(buckets []float64) InterceptorOption {
 	return func(i *interceptorOptions) { i.metrics.buckets = buckets }
 }
 
+// EnableCircuitBreaker using circuitbreaker to run function
+func EnableCircuitBreaker() InterceptorOption {
+	return func (i *interceptorOptions) { 
+		i.circuitBreaker = true
+	}
+}
+
 // StandardInterceptorClient return standard interceptor client of package
 func StandardInterceptorClient() *InterceptorClient {
 	return std
@@ -159,6 +170,8 @@ func ConfigInterceptorClient(ctx context.Context, options ...InterceptorOption) 
 	}
 
 	client := std
+	client.circuitBreaker = intercepOptions.circuitBreaker
+
 	if len(intercepOptions.tracing.service) > 0 && intercepOptions.tracing.collector != nil {
 		traceClient, err := trace.NewClient(ctx, intercepOptions.tracing.service)
 		if err != nil {
@@ -353,6 +366,13 @@ func (c *InterceptorClient) EnableAllMetrics(buckets []float64) *InterceptorClie
 func (c *InterceptorClient) EnableMetricsExportHTTPServer(port int) *InterceptorClient {
 	c.metrcsHttpServer = metrics.StartPrometheusMetricsHTTPServer(port)
 	log.Printf("enable metrics module")
+	return c
+}
+
+// EnableCircuitBreaker config circuit breaker module
+func (c *InterceptorClient) EnableCircuitBreaker() *InterceptorClient {
+	c.circuitBreaker = true
+	log.Printf("enable circuit-breaker module")
 	return c
 }
  
