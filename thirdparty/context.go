@@ -1,32 +1,20 @@
 package thirdparty
 
 import (
-	"log"
 	"strings"
 	"golang.org/x/net/context"
 )
 
+type SystemType = int
+
 const (
 	colonSep			= ":"
 
-	SystemFieldIndex 	= 0
-	DBFieldIndex		= 1
-	TableFieldIndex		= 2
-	ActionFieldIndex	= 3
-	SQLFieldIndex 		= 4
-	
-	DBMinTotalParams 	= 4
-	DBMaxTotalParams 	= 5
-
-	CacheActionFieldIndex  		 = 1
-	CacheCommandOptionFieldIndex = 2
-	CacheMinTotalParams = 2
-	
-	SearchIndexFieldIndex 	 = 1
-	SearchDocumentFieldIndex = 2
-	SearchActionFieldIndex   = 3
-	SearchCommandOptionFieldIndex  = 4
-	SearchMinTotalParams = 4
+	// ThirdpartyDatabaseSystem define thirdparty system type
+	TypeDatabaseSystem SystemType	= iota
+	TypeCacheSystem
+	TypeSearchSystem
+	TypeUnknown
 )
 
 type interceptorKey struct{}
@@ -56,46 +44,59 @@ type SearchParam struct {
 	Command     string
 }
 
-// JoinContextValue returns a derived context containing the values.
-func JoinContextValue(ctx context.Context, values ...string) context.Context {
+// joinContextValue returns a derived context containing the values.
+func joinContextValue(ctx context.Context, values ...string) context.Context {
 	return context.WithValue(ctx, interceptorKey{}, strings.Join(values, colonSep))
+}
+
+// DetectContextValue detect which type contained in context
+func DetectContextValue(ctx context.Context) SystemType {
+	v := ctx.Value(interceptorKey{})
+	if v != nil {
+		switch v.(type) {
+		case *DatabaseParam:
+			return TypeDatabaseSystem
+		case *CacheParam:
+			return TypeCacheSystem
+		case *SearchParam:
+			return TypeSearchSystem
+		}
+	}
+
+	return TypeUnknown
 }
 
 // JoinDatabaseContextValue returns a derived context containing the mongo values.
 func JoinDatabaseContextValue(ctx context.Context, system, db, table, action, sql string) context.Context {
-	values := make([]string, 4)
-	values[SystemFieldIndex] = system
-	values[DBFieldIndex] = db
-	values[TableFieldIndex] = table
-	values[ActionFieldIndex] = action
-	if len(sql) != 0 {
-		values = append(values, sql)
+	param := &DatabaseParam{
+		System: system,
+		Database: db,
+		Table: table,
+		Action: action,
+		SQL: sql,
 	}
-	return context.WithValue(ctx, interceptorKey{}, strings.Join(values, colonSep))
+	return context.WithValue(ctx, interceptorKey{}, param)
 }
 
 // JoinCacheContextValue returns a derived context containing the mongo values.
 func JoinCacheContextValue(ctx context.Context, system, action, command string) context.Context {
-	values := make([]string, 2)
-	values[SystemFieldIndex] = system
-	values[CacheActionFieldIndex] = action
-	if len(command) != 0 {
-		values = append(values, command)
+	param := &CacheParam{
+		System: system,
+		Action: action,
+		Command: command,
 	}
-	return context.WithValue(ctx, interceptorKey{}, strings.Join(values, colonSep))
+	return context.WithValue(ctx, interceptorKey{}, param)
 }
 
 // JoinSearchContextValue returns a derived context containing the mongo values.
-func JoinSearchContextValue(ctx context.Context, system, index, document, action, command string) context.Context {
-	values := make([]string, 4)
-	values[SystemFieldIndex] = system
-	values[SearchIndexFieldIndex] = index
-	values[SearchDocumentFieldIndex] = document
-	values[SearchActionFieldIndex] = action
-	if len(command) != 0 {
-		values = append(values, command)
+func JoinSearchContextValue(ctx context.Context, system, index, action, command string) context.Context {
+	param := &SearchParam{
+		System: system,
+		Index: index,
+		Action: action,
+		Command: command,
 	}
-	return context.WithValue(ctx, interceptorKey{}, strings.Join(values, colonSep))
+	return context.WithValue(ctx, interceptorKey{}, param)
 }
 
 // parseContextValue parse string
@@ -109,76 +110,18 @@ func parseContextValue(ctx context.Context) ([]string, bool) {
 
 // ParseDatabaeContextValue parse thirdparty database params from context
 func ParseDatabaeContextValue(ctx context.Context) (*DatabaseParam, bool) {
-	if values, ok := parseContextValue(ctx); ok {
-		if len(values) < DBMinTotalParams {
-			log.Printf("wrong number of database params")
-			return nil, false
-		}
-
-		params := &DatabaseParam{
-			System: values[SystemFieldIndex],
-			Database: values[DBFieldIndex],
-			Table: values[TableFieldIndex],
-			Action: values[ActionFieldIndex],
-		}
-
-		if len(values) >= DBMaxTotalParams {
-			params.SQL = values[SQLFieldIndex]
-		}
-
-		return params, true
-	}
-
-	log.Printf("failed to parse database params from context")
-	return nil, false
+	param, ok := ctx.Value(interceptorKey{}).(*DatabaseParam)
+	return param, ok
 }
 
 // ParseCacheContextValue parse thirdparty cache params from context
 func ParseCacheContextValue(ctx context.Context) (*CacheParam, bool) {
-	if values, ok := parseContextValue(ctx); ok {
-		if len(values) < CacheMinTotalParams {
-			log.Printf("wrong number of cache params")
-			return nil, false
-		}
-
-		params := &CacheParam{
-			System: values[SystemFieldIndex],
-			Action: values[CacheActionFieldIndex],
-		}
-
-		if len(values) > CacheMinTotalParams {
-			params.Command = values[CacheCommandOptionFieldIndex]
-		}
-
-		return params, true
-	}
-
-	log.Printf("failed to parse cache params from context")
-	return nil, false
+	param, ok := ctx.Value(interceptorKey{}).(*CacheParam)
+	return param, ok
 }
 
 // ParseSearchContextValue parse thirdparty search params from context
 func ParseSearchContextValue(ctx context.Context) (*SearchParam, bool) {
-	if values, ok := parseContextValue(ctx); ok {
-		if len(values) < SearchMinTotalParams {
-			log.Printf("wrong number of search params")
-			return nil, false
-		}
-
-		params := &SearchParam{
-			System: values[SystemFieldIndex],
-			Index: values[SearchIndexFieldIndex],
-			Document: values[SearchDocumentFieldIndex],
-			Action: values[SearchActionFieldIndex],
-		}
-
-		if len(values) > SearchMinTotalParams {
-			params.Command = values[SearchCommandOptionFieldIndex]
-		}
-
-		return params, true
-	}
-
-	log.Printf("failed to parse search params from context")
-	return nil, false
+	param, ok := ctx.Value(interceptorKey{}).(*SearchParam)
+	return param, ok
 }

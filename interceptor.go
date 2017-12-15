@@ -386,9 +386,25 @@ func (c *InterceptorClient) execute(ctx context.Context, f runFunc) (interface{}
 	}
 }
 
-// DoDBAction runs your function in a synchronous manner, blocking until either your function succeeds
+// Do runs your function in a synchronous manner, blocking until either your function succeeds
 // or an error is returned
-func (c *InterceptorClient) DoDBAction(ctx context.Context, f runFunc) (value interface{}, err error) {
+func (c *InterceptorClient) Do(ctx context.Context, run runFunc) (interface{}, error) {
+	t := thirdparty.DetectContextValue(ctx)
+	switch t {
+	case thirdparty.TypeDatabaseSystem:
+		return c.doDBAction(ctx, run)
+	case thirdparty.TypeCacheSystem:
+		return c.doCacheAction(ctx, run)
+	case thirdparty.TypeSearchSystem:
+		return c.doSearchAction(ctx, run)
+	default:
+		return run()
+	}
+}
+
+// doDBAction runs your function in a synchronous manner, blocking until either your function succeeds
+// or an error is returned
+func (c *InterceptorClient) doDBAction(ctx context.Context, f runFunc) (value interface{}, err error) {
 	params, ok := thirdparty.ParseDatabaeContextValue(ctx)
 	if !ok {		
 		return f()
@@ -408,9 +424,9 @@ func (c *InterceptorClient) DoDBAction(ctx context.Context, f runFunc) (value in
 	return
 }
 
-// DoCacheAction runs your function in a synchronous manner, blocking until either your function succeeds
+// doCacheAction runs your function in a synchronous manner, blocking until either your function succeeds
 // or an error is returned
-func (c *InterceptorClient) DoCacheAction(ctx context.Context, f runFunc) (value interface{}, err error) {
+func (c *InterceptorClient) doCacheAction(ctx context.Context, f runFunc) (value interface{}, err error) {
 	params, ok := thirdparty.ParseCacheContextValue(ctx)
 	if !ok {		
 		return f()
@@ -430,9 +446,9 @@ func (c *InterceptorClient) DoCacheAction(ctx context.Context, f runFunc) (value
 	return
 }
 
-// DoSearchAction runs your function in a synchronous manner, blocking until either your function succeeds
+// doSearchAction runs your function in a synchronous manner, blocking until either your function succeeds
 // or an error is returned
-func (c *InterceptorClient) DoSearchAction(ctx context.Context, f runFunc) (value interface{}, err error) {
+func (c *InterceptorClient) doSearchAction(ctx context.Context, f runFunc) (value interface{}, err error) {
 	params, ok := thirdparty.ParseSearchContextValue(ctx)
 	if !ok {		
 		return f()
