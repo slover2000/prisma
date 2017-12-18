@@ -25,6 +25,7 @@ func NewNumber(windows int) *Number {
 	}
 	r := &Number{
 		windows: windows,
+		buckets: make(map[int64]int),
 		Mutex:   &sync.RWMutex{},
 	}
 	return r
