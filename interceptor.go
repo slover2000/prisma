@@ -11,6 +11,7 @@ import (
 	"github.com/slover2000/prisma/trace"
 	"github.com/slover2000/prisma/logging"
 	"github.com/slover2000/prisma/thirdparty"
+	"github.com/slover2000/prisma/hystrix"
 	"github.com/slover2000/prisma/metrics"
 	"github.com/slover2000/prisma/metrics/prometheus"
 )
@@ -39,7 +40,6 @@ type InterceptorClient struct {
 	httpServerMetrics	metrics.ClientMetrics
 	wrapperMetrics		sync.Map
 	metrcsHttpServer	metrics.MetricsHttpServer
-	circuitBreaker      bool
 }
 
 type wrapperSystemMetrics struct {
@@ -50,7 +50,6 @@ type interceptorOptions struct {
 	tracing		tracingOptions
 	logging		loggingOptions
 	metrics     metricsOptions
-	circuitBreaker      bool
 }
 
 type loggingOptions struct {
@@ -150,13 +149,6 @@ func WithMetricsHistogramBuckets(buckets []float64) InterceptorOption {
 	return func(i *interceptorOptions) { i.metrics.buckets = buckets }
 }
 
-// EnableCircuitBreaker using circuitbreaker to run function
-func EnableCircuitBreaker() InterceptorOption {
-	return func (i *interceptorOptions) { 
-		i.circuitBreaker = true
-	}
-}
-
 // StandardInterceptorClient return standard interceptor client of package
 func StandardInterceptorClient() *InterceptorClient {
 	return std
@@ -170,8 +162,6 @@ func ConfigInterceptorClient(ctx context.Context, options ...InterceptorOption) 
 	}
 
 	client := std
-	client.circuitBreaker = intercepOptions.circuitBreaker
-
 	if len(intercepOptions.tracing.service) > 0 && intercepOptions.tracing.collector != nil {
 		traceClient, err := trace.NewClient(ctx, intercepOptions.tracing.service)
 		if err != nil {
@@ -369,13 +359,6 @@ func (c *InterceptorClient) EnableMetricsExportHTTPServer(port int) *Interceptor
 	return c
 }
 
-// EnableCircuitBreaker config circuit breaker module
-func (c *InterceptorClient) EnableCircuitBreaker() *InterceptorClient {
-	c.circuitBreaker = true
-	log.Printf("enable circuit-breaker module")
-	return c
-}
- 
 // CloseInterceptorClient close interceptor client
 func CloseInterceptorClient(c *InterceptorClient) {
 	if c.metrcsHttpServer != nil {
@@ -383,27 +366,37 @@ func CloseInterceptorClient(c *InterceptorClient) {
 	}
 }
 
-
 type actionResult struct{
 	value interface{}
 	err   error
 }
 
-type runFunc func() (interface{}, error)
-type fallbackFunc func(error) (interface{}, error)
+type runFunc = func() (interface{}, error)
+type fallbackFunc = func(error) (interface{}, error)
 
 func (c *InterceptorClient) execute(ctx context.Context, run runFunc, fallback fallbackFunc) (interface{}, error) {
+	if name, ok := hystrix.GetHystrixCommand(ctx); ok {
+		return hystrix.Execute(ctx, name, run, fallback)
+	}
+
+	// disable hystrix module
 	done := make(chan actionResult, 1)
 	go func() {
 		result, err := run()
-		done <- actionResult{value: result, err: err}
+		if err == nil {
+			done <- actionResult{value: result, err: err}
+		} else {			
+			fallbackResult, fallbackErr := fallback(err)
+			done <- actionResult{value: fallbackResult, err: fallbackErr}		
+		}		
 	}()
 	
 	select {
 	case result, _ := <-done:
 		return result.value, result.err
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		fallbackResult, fallbackErr := fallback(ctx.Err())
+		return fallbackResult, fallbackErr
 	}
 }
 

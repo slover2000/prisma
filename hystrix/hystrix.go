@@ -21,11 +21,27 @@ type actionResult struct{
 
 var errCircuitOpen error
 
-type runFunc func() (interface{}, error)
-type fallbackFunc func(error) (interface{}, error)
+type runFunc = func() (interface{}, error)
+type fallbackFunc = func(error) (interface{}, error)
+
+type hystrixKey struct{}
 
 func init() {
 	errCircuitOpen = errors.New("circuit open")
+}
+
+func WithGroup(ctx context.Context, name string) context.Context {
+	return context.WithValue(ctx, hystrixKey{}, name)
+}
+
+func GetHystrixCommand(ctx context.Context) (string, bool) {
+	v := ctx.Value(hystrixKey{})
+	if v != nil {
+		if name, ok := v.(string); ok {
+			return name, true
+		}
+	}
+	return "", false
 }
 
 // Execute runs your function in a synchronous manner, blocking until either your function succeeds

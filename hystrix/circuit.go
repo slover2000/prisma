@@ -39,7 +39,7 @@ func newCircuitBreaker(name string) *CircuitBreaker {
 	config := getSettings(name)
 	c := &CircuitBreaker{
 		Name: name,
-		metrics: newMetricCollector(name, 0),
+		metrics: newMetricCollector(name, config.RollingWindows),
 		Limiter: rate.NewLimiter(rate.Limit(config.MaxQPS), 1 + config.MaxQPS),
 	}
 

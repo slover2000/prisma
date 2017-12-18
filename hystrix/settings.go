@@ -16,7 +16,10 @@ const (
 	DefaultSleepWindow = 5000
 
 	// DefaultErrorPercentThreshold causes circuits to open once the rolling measure of errors exceeds this percent of requests
-	DefaultErrorPercentThreshold = 50	
+	DefaultErrorPercentThreshold = 50
+
+	// DefaultRollingWindows reserved define how many values should be reserved in seconds
+	DefaultRollingWindows = int((DefaultSleepWindow / 1000) * 100 / DefaultErrorPercentThreshold)
 )
 
 // Settings hystrix settings
@@ -25,6 +28,7 @@ type Settings struct {
 	RequestVolumeThreshold int
 	SleepWindow            time.Duration
 	ErrorPercentThreshold  int
+	RollingWindows         int
 }
 
 // CommandConfig is used to tune circuit settings at runtime
@@ -33,6 +37,7 @@ type CommandConfig struct {
 	RequestVolumeThreshold int `json:"request_volume_threshold"`
 	SleepWindow            int `json:"sleep_window"`
 	ErrorPercentThreshold  int `json:"error_percent_threshold"`
+	RollingWindows         int `json:"rolling_windows"`
 }
 
 var circuitSettings *sync.Map
@@ -63,11 +68,17 @@ func ConfigureCommand(name string, config CommandConfig) {
 		errorPercent = config.ErrorPercentThreshold
 	}
 
+	rollingWindows := DefaultRollingWindows
+	if config.RollingWindows != 0 {
+		rollingWindows = config.RollingWindows
+	}	
+
 	setting := &Settings{
 		MaxQPS:                 qps,
 		RequestVolumeThreshold: volume,
 		SleepWindow:            time.Duration(sleep) * time.Millisecond,
 		ErrorPercentThreshold:  errorPercent,
+		RollingWindows:         rollingWindows,
 	}
 	circuitSettings.Store(name, setting)
 }
