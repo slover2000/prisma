@@ -52,7 +52,7 @@ func Execute(ctx context.Context, name string, run runFunc, fallback fallbackFun
 	circuit := GetCircuit(name)
 	go func() {
 		var result actionResult		
-		if circuit.AllowRequest() {
+		if circuit.AttemptExecution() {
 			value, err := run()
 			result.value = value
 			result.err = err
