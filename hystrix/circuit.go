@@ -24,7 +24,7 @@ type CircuitBreaker struct {
 	forceOpen      bool
 	openedTime 	   int64
 	metrics        MetricCollector
-	*rate.Limiter
+	limiter        *rate.Limiter
 }
 
 var circuitBreakers	sync.Map
@@ -48,7 +48,9 @@ func newCircuitBreaker(name string) *CircuitBreaker {
 		name: name,
 		status: Closed,
 		metrics: newMetricCollector(name, config.RollingWindows),
-		Limiter: rate.NewLimiter(rate.Limit(config.MaxQPS), 1 + config.MaxQPS),
+	}
+	if config.MaxQPS > 0 {
+		c.limiter = rate.NewLimiter(rate.Limit(config.MaxQPS), 1 + config.MaxQPS)
 	}
 
 	return c
@@ -69,10 +71,12 @@ func (circuit *CircuitBreaker) IsOpen() bool {
 		return true
 	}
 
-	now := time.Now()
-	if !circuit.AllowN(now, 1) {
-		return true
-	}	
+	if circuit.limiter != nil {
+		now := time.Now()
+		if !circuit.limiter.AllowN(now, 1) {
+			return true
+		}
+	}
 
 	return atomic.LoadInt64(&circuit.openedTime) > 0
 }
@@ -86,9 +90,11 @@ func (circuit *CircuitBreaker) AllowRequest() bool {
 		return false
 	}
 
-	now := time.Now()
-	if !circuit.AllowN(now, 1) {
-		return false
+	if circuit.limiter != nil {
+		now := time.Now()
+		if !circuit.limiter.AllowN(now, 1) {
+			return false
+		}
 	}
 
 	if atomic.LoadInt64(&circuit.openedTime) == 0 {
@@ -113,6 +119,13 @@ func (circuit *CircuitBreaker) isAfterSleepWindow() bool {
 func (circuit *CircuitBreaker) AttemptExecution() bool {
 	if circuit.forceOpen {
 		return false
+	}
+
+	if circuit.limiter != nil {
+		now := time.Now()
+		if !circuit.limiter.AllowN(now, 1) {
+			return false
+		}
 	}
 
 	if atomic.LoadInt64(&circuit.openedTime) == 0 {

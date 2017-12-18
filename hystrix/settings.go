@@ -6,9 +6,6 @@ import (
 )
 
 const (
-	// DefaultMaxQPS is how many commands of the same type can run at the same time
-	DefaultMaxQPS = 100
-
 	// DefaultVolumeThreshold is the minimum number of requests needed before a circuit can be tripped due to health
 	DefaultVolumeThreshold = 20
 
@@ -48,7 +45,7 @@ func init() {
 
 // ConfigureCommand applies settings for a circuit
 func ConfigureCommand(name string, config CommandConfig) {
-	qps := DefaultMaxQPS
+	qps := 0
 	if config.MaxQPS != 0 {
 		qps = config.MaxQPS
 	}
