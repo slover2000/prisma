@@ -79,6 +79,9 @@ func Execute(ctx context.Context, name string, run runFunc, fallback fallbackFun
 		return result.value, result.err
 	case <-ctx.Done():
 		eventType = timeoutTypeError
+		if fallback != nil {
+			return fallback(ctx.Err())
+		}
 		return nil, ctx.Err()
 	}
 }
