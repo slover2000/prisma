@@ -145,7 +145,7 @@ func (circuit *CircuitBreaker) AttemptExecution() bool {
 		} else {
 			return false;
 		}
-	}	
+	}
 }
 
 // Invoked on successful executions from {@link HystrixCommand} as part of feedback mechanism when in a half-open state.

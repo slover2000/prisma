@@ -19,12 +19,12 @@ func TestGetCircuit(t *testing.T) {
 		t.Errorf("TestGetCircuit expect circuit name is %s", "command")
 	}
 
-	limit := circuitCommand.Limit()
+	limit := circuitCommand.limiter.Limit()
 	if float64(limit) != float64(1000) {
 		t.Errorf("TestGetCircuit expect limit is %d", 1000)
 	}
 
-	if circuitCommand.Burst() != (1000 + 1) {
+	if circuitCommand.limiter.Burst() != (1000 + 1) {
 		t.Errorf("TestGetCircuit expect limit is %d", 1001)
 	}
 }
