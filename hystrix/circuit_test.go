@@ -52,29 +52,47 @@ func TestCircuitToggleForeOpen(t *testing.T) {
 }
 
 func TestCircuitQPS(t *testing.T) {
+	ConfigureCommand("foo1", CommandConfig{MaxQPS: 100, RequestVolumeThreshold: 100, SleepWindow: 15, RollingWindows: 20, ErrorPercentThreshold: 30})
 	circuit := GetCircuit("foo1")
 	config := getSettings("foo1")
+	t.Parallel()
+	var wg sync.WaitGroup
+	wg.Add(config.MaxQPS+1)
 	for i := 0; i < config.MaxQPS + 1; i++ {
-		b := circuit.AllowRequest()
-		if !b {
-			t.Errorf("TestGetCircuit expect circuit allow request")
-		}
+		go func() {
+			b := circuit.AllowRequest()
+			if !b {
+				t.Errorf("TestGetCircuit expect circuit allow request")
+			}
+			wg.Done()
+		}()
 	}
+	wg.Wait()
 
+	wg.Add(10)
 	for i := 0; i < 10; i++ {
-		b := circuit.AllowRequest()
-		if b {
-			t.Errorf("TestGetCircuit expect circuit should not allowe request")
-		}
+		go func() {
+			b := circuit.AllowRequest()
+			if b {
+				t.Errorf("TestGetCircuit expect circuit should not allowe request")
+			}
+			wg.Done()
+		}()
 	}
+	wg.Wait()
 
 	time.Sleep(2 * time.Second)
+	wg.Add(config.MaxQPS+1)
 	for i := 0; i < config.MaxQPS + 1; i++ {
-		b := circuit.AllowRequest()
-		if !b {
-			t.Errorf("TestGetCircuit expect circuit allow request")
-		}
-	}	
+		go func() {
+			b := circuit.AllowRequest()
+			if !b {
+				t.Errorf("TestGetCircuit expect circuit allow request")
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
 }
 
 func TestCircuitStatus(t *testing.T) {
