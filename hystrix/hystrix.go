@@ -64,9 +64,8 @@ func Execute(ctx context.Context, name string, run runFunc, fallback fallbackFun
 				value, err := fallback(errCircuitOpen)
 				result.value = value
 				result.err = err
-				eventType = circuitTypeError
 			} else {
-				result.err = errCircuitOpen				
+				result.err = errCircuitOpen
 			}
 			eventType = circuitTypeError
 		}
