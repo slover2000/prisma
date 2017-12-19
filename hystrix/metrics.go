@@ -139,8 +139,7 @@ func (d *metricCollector) IncrementErrors() {
 func (d *metricCollector) IncrementSuccesses() {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()		
-	d.successes.Increment(1)
-	promMetrics.errorCounter.WithLabelValues(d.name, "success").Inc()
+	d.successes.Increment(1)	
 }
 
 // IncrementFailures increments the number of failures seen in the latest time bucket.
