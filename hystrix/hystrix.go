@@ -50,16 +50,6 @@ func GetHystrixCommand(ctx context.Context) (string, bool) {
 	return "", false
 }
 
-func getClientMetrics(ctx context.Context) metrics.ClientMetrics {
-	v := ctx.Value(clientMetricsKey{})
-	if v != nil {
-		if metrics, ok := v.(metrics.ClientMetrics); ok {
-			return metrics
-		}
-	}
-	return nil
-}
-
 // Execute runs your function in a synchronous manner, blocking until either your function succeeds
 // or an error is returned, including hystrix circuit errors
 func Execute(ctx context.Context, name string, run runFunc, fallback fallbackFunc) (interface{}, error) {
@@ -87,7 +77,7 @@ func Execute(ctx context.Context, name string, run runFunc, fallback fallbackFun
 		}
 		done <- result
 	}()
-	defer circuit.ReportEvent(eventType, getClientMetrics(ctx))
+	defer circuit.ReportEvent(eventType)
 
 	select {
 	case result, _ := <-done:

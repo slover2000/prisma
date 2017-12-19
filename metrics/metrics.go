@@ -31,8 +31,6 @@ type ClientMetrics interface {
 	CounterDatabase(params *p.DatabaseParam, duration time.Duration, err error)
 	CounterCache(params *p.CacheParam, duration time.Duration, err error)
 	CounterSearch(params *p.SearchParam, duration time.Duration, err error)
-	CounterHystrixAttemps(name string, failureType int)
-	CounterHystrixCircuit(name string, isOpen bool)
 	Close() error
 }
 

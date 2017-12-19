@@ -73,14 +73,6 @@ func (c *perfcounterClient) CounterSearch(params *p.SearchParam, duration time.D
 	
 }
 
-func (c *perfcounterClient) CounterHystrixAttemps(name string, failureType int, circuitChanged, isOpen bool) {
-
-}
-
-func (c *perfcounterClient) CounterHystrixCircuit(name string, isOpen bool) {
-	
-}
-
 func (c *perfcounterClient) count(name string, count int64, err error) {
 	realName := makeMetricsName(name, meterSuffixName, err)
 	meter := metrics.GetOrRegisterMeter(realName, c.registry)

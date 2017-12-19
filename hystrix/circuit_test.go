@@ -4,8 +4,6 @@ import (
 	"time"
 	"sync"
 	"testing"
-
-	"github.com/slover2000/prisma/metrics"
 )
 
 func TestGetCircuit(t *testing.T) {
@@ -97,17 +95,12 @@ func TestCircuitQPS(t *testing.T) {
 	wg.Wait()
 }
 
-func getMetrics() metrics.ClientMetrics {
-	return nil
-}
-
 func TestCircuitStatus(t *testing.T) {
 	circuit := GetCircuit("foo2")
 	config := getSettings("foo2")
-	metrics := getMetrics()
 	for i := 0; i < config.MaxQPS + 1; i++ {
 		if circuit.AllowRequest() {
-			circuit.ReportEvent(successTypeError, metrics)
+			circuit.ReportEvent(successTypeError)
 		} else {
 			t.Errorf("TestGetCircuit expect circuit allow request")
 		}
@@ -123,7 +116,7 @@ func TestCircuitErrorStatusWithFinalSucc(t *testing.T) {
 	for i := 0; i < config.RequestVolumeThreshold; i++ {
 		go func() {
 			if circuit.AttemptExecution() {
-				circuit.ReportEvent(failureTypeError, nil)
+				circuit.ReportEvent(failureTypeError)
 			}
 			defer wg.Done()
 		}()
@@ -140,7 +133,7 @@ func TestCircuitErrorStatusWithFinalSucc(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			if circuit.AttemptExecution() {
-				circuit.ReportEvent(successTypeError, nil)
+				circuit.ReportEvent(successTypeError)
 			}
 			defer wg2.Done()
 		}()
@@ -157,7 +150,7 @@ func TestCircuitErrorStatusWithFinalFailed(t *testing.T) {
 	for i := 0; i < config.RequestVolumeThreshold; i++ {
 		go func() {
 			if circuit.AttemptExecution() {
-				circuit.ReportEvent(failureTypeError, nil)
+				circuit.ReportEvent(failureTypeError)
 			}
 			defer wg.Done()			
 		}()
@@ -174,7 +167,7 @@ func TestCircuitErrorStatusWithFinalFailed(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			if circuit.AttemptExecution() {
-				circuit.ReportEvent(timeoutTypeError, nil)
+				circuit.ReportEvent(timeoutTypeError)
 			}
 			defer wg2.Done()			
 		}()	

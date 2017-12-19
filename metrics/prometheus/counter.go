@@ -9,7 +9,7 @@ import (
 
 	m "github.com/slover2000/prisma/metrics"
 	p "github.com/slover2000/prisma/thirdparty"
-	prom "github.com/prometheus/client_golang/prometheus"	
+	prom "github.com/prometheus/client_golang/prometheus"
 )
 
 const (

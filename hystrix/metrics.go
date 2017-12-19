@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/slover2000/prisma/hystrix/internal"
+	prom "github.com/prometheus/client_golang/prometheus"
 )
 
 // MetricCollector represents the contract that all collectors must fulfill to gather circuit statistics.
@@ -21,6 +22,8 @@ type MetricCollector interface {
 	IncrementSuccesses()
 	// IncrementFailures increments the number of requests that fail.
 	IncrementFailures()
+	// MarkCircuitStatus mark current circuit breaker status
+	MarkCircuitStatus(isOpen bool, status string)
 
 	NumRequests() *internal.Number
 	Errors() *internal.Number
@@ -39,6 +42,39 @@ type metricCollector struct {
 
 	successes   *internal.Number
 	failures    *internal.Number
+}
+
+type prometheusMetrics struct {	
+	totalCounter *prom.CounterVec
+	errorCounter *prom.CounterVec	
+	gauge        *prom.GaugeVec	
+}
+
+var promMetrics *prometheusMetrics
+
+func init() {
+	promMetrics = &prometheusMetrics{
+		totalCounter: prom.NewCounterVec(
+			prom.CounterOpts{
+				Name: "hystrix_attempt_total",
+				Help: "Total number of hystrix attempts, regardless of success or failure.",
+			}, []string{"group"}),
+	
+		errorCounter: prom.NewCounterVec(
+			prom.CounterOpts{
+				Name: "hystrix_failure_total",
+				Help: "Total number of failures by hystrix.",
+			}, []string{"group", "failure"}),
+	
+		gauge: prom.NewGaugeVec(
+			prom.GaugeOpts{
+				Name: "hystrix_circuit_status",
+				Help: "The number of hystrix circuit status.",
+			}, []string{"group", "status"}),
+	}
+	prom.MustRegister(promMetrics.totalCounter)
+	prom.MustRegister(promMetrics.errorCounter)
+	prom.MustRegister(promMetrics.gauge)
 }
 
 func newMetricCollector(name string, windows int) MetricCollector {
@@ -85,8 +121,9 @@ func (d *metricCollector) Failures() *internal.Number {
 // IncrementAttempts increments the number of requests seen in the latest time bucket.
 func (d *metricCollector) IncrementAttempts() {
 	d.mutex.RLock()
-	defer d.mutex.RUnlock()	
+	defer d.mutex.RUnlock()
 	d.numRequests.Increment(1)
+	promMetrics.totalCounter.WithLabelValues(d.name).Inc()
 }
 
 // IncrementErrors increments the number of errors seen in the latest time bucket.
@@ -95,6 +132,7 @@ func (d *metricCollector) IncrementErrors() {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()		
 	d.errors.Increment(1)
+	promMetrics.errorCounter.WithLabelValues(d.name, "error").Inc()
 }
 
 // IncrementSuccesses increments the number of successes seen in the latest time bucket.
@@ -102,6 +140,7 @@ func (d *metricCollector) IncrementSuccesses() {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()		
 	d.successes.Increment(1)
+	promMetrics.errorCounter.WithLabelValues(d.name, "success").Inc()
 }
 
 // IncrementFailures increments the number of failures seen in the latest time bucket.
@@ -109,6 +148,7 @@ func (d *metricCollector) IncrementFailures() {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()		
 	d.failures.Increment(1)
+	promMetrics.errorCounter.WithLabelValues(d.name, "failure").Inc()
 }
 
 func (d *metricCollector) errorPercent(now time.Time) int {
@@ -124,6 +164,15 @@ func (d *metricCollector) errorPercent(now time.Time) int {
 
 func (d *metricCollector) IsHealthy(now time.Time) bool {
 	return d.errorPercent(now) < getSettings(d.name).ErrorPercentThreshold
+}
+
+func (d *metricCollector) MarkCircuitStatus(open bool, status string) {
+	if open {
+		promMetrics.gauge.WithLabelValues(d.name, status).Set(1)
+	} else {
+		promMetrics.gauge.WithLabelValues(d.name, status).Set(0)
+	}
+	
 }
 
 func (d *metricCollector) Reset() {
