@@ -27,9 +27,9 @@ var (
 
 type prometheusClient struct {
 	totalCounter       *prom.CounterVec
-	errorCounter       *prom.CounterVec		
-	durationHistogram  *prom.HistogramVec
-	properties 			map[string]string
+	errorCounter       *prom.CounterVec
+	durationHistogram  *prom.HistogramVec	
+	gauge              prom.Gauge
 }
 
 // NewGRPCClientPrometheus returns a ClientMetrics object. Use a new instance of
@@ -292,11 +292,38 @@ func NewSearchClientPrometheus(system string, buckets []float64) m.ClientMetrics
 	return client
 }
 
-func (c *prometheusClient) CounterGRPC(name string, duration time.Duration, err error) {
-	if c == nil {
-		return
-	}
+// NewHystrixPrometheus returns a ClientMetrics object. Use a new instance of
+// ClientMetrics when not using the default Prometheus metrics registry, for
+// example when wanting to control which metrics are added to a registry as
+// opposed to automatically adding metrics via init functions.
+func NewHystrixPrometheus() m.ClientMetrics {
+	client := &prometheusClient{
+		totalCounter: prom.NewCounterVec(
+			prom.CounterOpts{
+				Name: "hystrix_attempt_total",
+				Help: "Total number of hystrix attempts, regardless of success or failure.",
+			}, []string{"group"}),
 
+		errorCounter: prom.NewCounterVec(
+			prom.CounterOpts{
+				Name: "hystrix_failures_total",
+				Help: "Total number of rejection by hystrix.",
+			}, []string{"group", "failure_type"}),
+
+		gauge: prom.NewGauge(
+			prom.GaugeOpts{
+				Name: "hystrix_circuit_status",
+				Help: "The number of hystrix opening.",
+			}),
+	}
+	prom.MustRegister(client.totalCounter)
+	prom.MustRegister(client.errorCounter)
+	prom.MustRegister(client.gauge)
+
+	return client
+}
+
+func (c *prometheusClient) CounterGRPC(name string, duration time.Duration, err error) {
 	code := grpc.Code(err)
 	serviceName, methodName := m.SplitGRPCMethodName(name)
 	// 记录total counter
@@ -316,10 +343,6 @@ func (c *prometheusClient) CounterGRPC(name string, duration time.Duration, err 
 }
 
 func (c *prometheusClient) CounterHTTP(req *http.Request, duration time.Duration, code int) {
-	if c == nil {
-		return
-	}
-		
 	// 记录total counter, like QPS
 	c.totalCounter.WithLabelValues(req.URL.Host, req.URL.Path, req.Method, fmt.Sprintf("%d", code)).Inc()
 
@@ -337,11 +360,7 @@ func (c *prometheusClient) CounterHTTP(req *http.Request, duration time.Duration
 }
 
 
-func (c *prometheusClient) CounterDatabase(params *p.DatabaseParam, duration time.Duration, err error) {
-	if c == nil {
-		return
-	}
-		
+func (c *prometheusClient) CounterDatabase(params *p.DatabaseParam, duration time.Duration, err error) {	
 	// 记录total counter, like QPS
 	errStr := ""
 	if err != nil {
@@ -367,10 +386,6 @@ func (c *prometheusClient) Close() error {
 }
 
 func (c *prometheusClient) CounterCache(params *p.CacheParam, duration time.Duration, err error) {
-	if c == nil {
-		return
-	}
-
 	// 记录total counter, like QPS
 	errStr := ""
 	if err != nil {
@@ -392,10 +407,6 @@ func (c *prometheusClient) CounterCache(params *p.CacheParam, duration time.Dura
 }
 
 func (c *prometheusClient) CounterSearch(params *p.SearchParam, duration time.Duration, err error) {
-	if c == nil {
-		return
-	}
-	
 	// 记录total counter, like QPS
 	errStr := ""
 	if err != nil {
@@ -414,4 +425,21 @@ func (c *prometheusClient) CounterSearch(params *p.SearchParam, duration time.Du
 		ms = 1
 	}
 	c.durationHistogram.WithLabelValues(params.Index, params.Document, params.Action, errStr).Observe(float64(ms))	
+}
+
+func (c *prometheusClient) CounterHystrixAttemps(name string, failureType int) {
+	c.totalCounter.WithLabelValues(name).Inc()
+
+	if failureType != 0 {
+		c.errorCounter.WithLabelValues(name, fmt.Sprintf("%d", failureType)).Inc()
+	}
+}
+
+func (c *prometheusClient) CounterHystrixCircuit(name string, isOpen bool) {
+	if isOpen {
+		c.gauge.Set(1)
+	} else {
+		c.gauge.Set(0)
+	}
+	c.gauge.SetToCurrentTime()
 }

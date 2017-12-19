@@ -36,10 +36,6 @@ func NewPerfcounter(project string) m.ClientMetrics {
 }
 
 func (c *perfcounterClient) CounterGRPC(name string, duration time.Duration, err error) {
-	if c == nil {
-		return
-	}
-
 	// 记录Counter, like QPS
 	c.count(name, 1, err)
 
@@ -48,10 +44,6 @@ func (c *perfcounterClient) CounterGRPC(name string, duration time.Duration, err
 }
 
 func (c *perfcounterClient) CounterHTTP(req *http.Request, duration time.Duration, code int) {
-	if c == nil {
-		return
-	}
-
 	name := req.URL.Path // drop scheme and query params
 
 	// 记录Counter, like QPS
@@ -78,6 +70,14 @@ func (c *perfcounterClient) CounterCache(params *p.CacheParam, duration time.Dur
 }
 
 func (c *perfcounterClient) CounterSearch(params *p.SearchParam, duration time.Duration, err error) {
+	
+}
+
+func (c *perfcounterClient) CounterHystrixAttemps(name string, failureType int, circuitChanged, isOpen bool) {
+
+}
+
+func (c *perfcounterClient) CounterHystrixCircuit(name string, isOpen bool) {
 	
 }
 

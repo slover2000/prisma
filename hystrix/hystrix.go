@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"golang.org/x/net/context"
+	"github.com/slover2000/prisma/metrics"
 )
 
 type errorType = int
@@ -25,6 +26,7 @@ type runFunc = func() (interface{}, error)
 type fallbackFunc = func(error) (interface{}, error)
 
 type hystrixKey struct{}
+type clientMetricsKey struct{}
 
 func init() {
 	errCircuitOpen = errors.New("circuit open")
@@ -32,6 +34,10 @@ func init() {
 
 func WithGroup(ctx context.Context, name string) context.Context {
 	return context.WithValue(ctx, hystrixKey{}, name)
+}
+
+func WithMetrics(ctx context.Context, metrics metrics.ClientMetrics) context.Context {
+	return context.WithValue(ctx, clientMetricsKey{}, metrics)
 }
 
 func GetHystrixCommand(ctx context.Context) (string, bool) {
@@ -42,6 +48,16 @@ func GetHystrixCommand(ctx context.Context) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func getClientMetrics(ctx context.Context) metrics.ClientMetrics {
+	v := ctx.Value(clientMetricsKey{})
+	if v != nil {
+		if metrics, ok := v.(metrics.ClientMetrics); ok {
+			return metrics
+		}
+	}
+	return nil
 }
 
 // Execute runs your function in a synchronous manner, blocking until either your function succeeds
@@ -71,7 +87,7 @@ func Execute(ctx context.Context, name string, run runFunc, fallback fallbackFun
 		}
 		done <- result
 	}()
-	defer circuit.ReportEvent(eventType)
+	defer circuit.ReportEvent(eventType, getClientMetrics(ctx))
 
 	select {
 	case result, _ := <-done:

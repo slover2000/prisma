@@ -38,6 +38,7 @@ type InterceptorClient struct {
 	grpcServerMetrics   metrics.ClientMetrics
 	httpClientMetrics	metrics.ClientMetrics
 	httpServerMetrics	metrics.ClientMetrics
+	hystrixMetrics      metrics.ClientMetrics
 	wrapperMetrics		sync.Map
 	metrcsHttpServer	metrics.MetricsHttpServer
 }
@@ -77,7 +78,9 @@ type metricsOptions struct {
 type InterceptorOption func(*interceptorOptions)
 
 func init() {
-	std = &InterceptorClient{}
+	std = &InterceptorClient{
+		hystrixMetrics: prometheus.NewHystrixPrometheus(),
+	}
 }
 
 // EnableLoggingWithEntry config log system
@@ -214,7 +217,7 @@ func ConfigInterceptorClient(ctx context.Context, options ...InterceptorOption) 
 	if intercepOptions.metrics.httpServer {
 		client.httpServerMetrics = prometheus.NewHTTPServerPrometheus(intercepOptions.metrics.buckets)
 		enableAnyMetric = true
-	}
+	}	
 
 	if enableAnyMetric {
 		client.metrcsHttpServer = metrics.StartPrometheusMetricsHTTPServer(intercepOptions.metrics.listenPort)
@@ -376,6 +379,7 @@ type fallbackFunc = func(error) (interface{}, error)
 
 func (c *InterceptorClient) execute(ctx context.Context, run runFunc, fallback fallbackFunc) (interface{}, error) {
 	if name, ok := hystrix.GetHystrixCommand(ctx); ok {
+		hystrix.WithMetrics(ctx, c.hystrixMetrics)
 		return hystrix.Execute(ctx, name, run, fallback)
 	}
 

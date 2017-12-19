@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
+
+	"github.com/slover2000/prisma/metrics"
 )
 
 type StatusType = int32
@@ -149,42 +151,51 @@ func (circuit *CircuitBreaker) AttemptExecution() bool {
 }
 
 // Invoked on successful executions from {@link HystrixCommand} as part of feedback mechanism when in a half-open state.
-func (circuit *CircuitBreaker) markSuccess() {
+func (circuit *CircuitBreaker) markSuccess(metrics metrics.ClientMetrics) {
 	if atomic.CompareAndSwapInt32(&circuit.status, HalfOpen, Closed) {
 		//This goroutine wins the race to close the circuit - it resets the stream to start it over from 0
 		circuit.metrics.Reset()
-		atomic.StoreInt64(&circuit.openedTime, 0)		
+		atomic.StoreInt64(&circuit.openedTime, 0)
+		if metrics != nil {
+			metrics.CounterHystrixCircuit(circuit.name, false)
+		}		
 		log.Printf("hystrix: closing circuit %s", circuit.name)
 	}
 }
 
 // Invoked on unsuccessful executions from {@link HystrixCommand} as part of feedback mechanism when in a half-open state.
-func (circuit *CircuitBreaker) markNonSuccess() {
+func (circuit *CircuitBreaker) markNonSuccess(metrics metrics.ClientMetrics) {
 	if atomic.CompareAndSwapInt32(&circuit.status, HalfOpen, Open) {
 		//This goroutine wins the race to re-open the circuit - it resets the start time for the sleep window
 		atomic.StoreInt64(&circuit.openedTime, time.Now().UnixNano())
+		if metrics != nil {
+			metrics.CounterHystrixCircuit(circuit.name, true)
+		}
 		log.Printf("hystrix: opening circuit %s", circuit.name)
 	}
 }
 
 // ReportEvent records command metrics for tracking recent error rates
-func (circuit *CircuitBreaker) ReportEvent(t errorType) {
+func (circuit *CircuitBreaker) ReportEvent(t errorType, metrics metrics.ClientMetrics) {
 	switch t {
 	case successTypeError:
 		circuit.metrics.IncrementAttempts()
 		circuit.metrics.IncrementSuccesses()
-		circuit.markSuccess()
+		circuit.markSuccess(metrics)
 	case failureTypeError:
 		circuit.metrics.IncrementAttempts()
 		circuit.metrics.IncrementErrors()
-		circuit.markNonSuccess()
+		circuit.markNonSuccess(metrics)
 	case circuitTypeError:
 		circuit.metrics.IncrementAttempts()
 		circuit.metrics.IncrementFailures()
 	case timeoutTypeError:
 		circuit.metrics.IncrementAttempts()
 		circuit.metrics.IncrementErrors()
-		circuit.markNonSuccess()
+		circuit.markNonSuccess(metrics)
+	}
+	if metrics != nil {
+		metrics.CounterHystrixAttemps(circuit.name, t)
 	}
 
 	// update health counter
@@ -206,6 +217,9 @@ func (circuit *CircuitBreaker) ReportEvent(t errorType) {
 			// our failure rate is too high, we need to set the state to OPEN
 			if atomic.CompareAndSwapInt32(&circuit.status, Closed, Open) {
 				atomic.StoreInt64(&circuit.openedTime, now.UnixNano())
+				if metrics != nil {
+					metrics.CounterHystrixCircuit(circuit.name, true)
+				}
 				log.Printf("hystrix: opening circuit %s due to failure rate is too high", circuit.name)
 			}
 		}
