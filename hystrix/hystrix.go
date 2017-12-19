@@ -26,7 +26,6 @@ type runFunc = func() (interface{}, error)
 type fallbackFunc = func(error) (interface{}, error)
 
 type hystrixKey struct{}
-type clientMetricsKey struct{}
 
 func init() {
 	errCircuitOpen = errors.New("circuit open")
@@ -34,10 +33,6 @@ func init() {
 
 func WithGroup(ctx context.Context, name string) context.Context {
 	return context.WithValue(ctx, hystrixKey{}, name)
-}
-
-func WithMetrics(ctx context.Context, metrics metrics.ClientMetrics) context.Context {
-	return context.WithValue(ctx, clientMetricsKey{}, metrics)
 }
 
 func GetHystrixCommand(ctx context.Context) (string, bool) {
