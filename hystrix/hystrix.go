@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"golang.org/x/net/context"
-	"github.com/slover2000/prisma/metrics"
 )
 
 type errorType = int
