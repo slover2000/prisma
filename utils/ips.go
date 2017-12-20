@@ -1,10 +1,10 @@
 package utils
 
 import (
-	"net"
 	"errors"
-	"strings"
+	"net"
 	"strconv"
+	"strings"
 )
 
 // LocalIPs return all non-loopback IP addresses
@@ -16,12 +16,29 @@ func LocalIPs() ([]string, error) {
 	}
 
 	for _, a := range addrs {
-		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {			
+		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
 			ips = append(ips, ipnet.IP.String())
 		}
 	}
 
 	return ips, nil
+}
+
+// GetOneLocalIP get best local ip
+func GetOneLocalIP() (string, error) {
+	var ip string
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ip, err
+	}
+
+	for _, a := range addrs {
+		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
+			return ipnet.IP.String(), nil
+		}
+	}
+
+	return ip, errors.New("not found ip")
 }
 
 // IPToInt32 convert a ip like "128.1.1.1" to int32
