@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	p "github.com/slover2000/prisma/thirdparty"
+	"github.com/slover2000/prisma/metrics/internal"
 )
 
 type grpcType = string
