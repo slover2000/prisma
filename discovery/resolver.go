@@ -20,10 +20,10 @@ type etcdResolver struct {
 	systemName	string
 	serviceName string
 	environment EnvironmentType
-	groupName		string
+	groupName   string
 	dialTimeout time.Duration
 	client      *clientv3.Client
-	closed 			bool
+	closed      bool
 }
 
 type ResolverOption func(*etcdResolver)
@@ -148,8 +148,8 @@ func (r *etcdResolver) Watch(target string, receiver ChangeReceiver) ([]*Update,
 
 // Close close etcd v3 client
 func (r *etcdResolver) Close() {
-	r.client.Close()
 	r.closed = true
+	r.client.Close()	
 }
 
 // @Title resolve the service from etcd, target is the dial address of etcd 
