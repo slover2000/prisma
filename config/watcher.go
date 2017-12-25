@@ -16,20 +16,25 @@ type configReaderOptions struct {
 	useMsgpackCodec bool
 	dialTimeout     time.Duration
 	path            string
-	valueType       interface{}
+	factory         TypeFactory
 }
 
 type configWatcher struct {
-	client    *clientv3.Client
-	codec     codec.Codec
-	valueType interface{}
-	notifier  DataReceiver
-	closed    bool
+	client   *clientv3.Client
+	codec    codec.Codec
+	factory  TypeFactory
+	receiver DataReceiver
+	closed   bool
 }
 
 // Watcher define config watcher interface
 type Watcher interface {
 	Close()
+}
+
+// TypeFactory define factory of data type
+type TypeFactory interface {
+	New() interface{}
 }
 
 // ReaderOption define options of config reader
@@ -50,11 +55,11 @@ func WithDialTimeout(timeout time.Duration) ReaderOption {
 	return func(c *configReaderOptions) { c.dialTimeout = timeout }
 }
 
-func RegisterValueType(t interface{}) ReaderOption {
-	return func(c *configReaderOptions) { c.valueType = t }
+func RegisterTypeFactory(factory TypeFactory) ReaderOption {
+	return func(c *configReaderOptions) { c.factory = factory }
 }
 
-func RegisterEtcdWatcher(target string, r DataReceiver, options ...ReaderOption) (Watcher, error) {
+func NewConfigWatcher(target string, r DataReceiver, options ...ReaderOption) (Watcher, error) {
 	configOptions := &configReaderOptions{
 		dialTimeout: 5 * time.Second,
 	}
@@ -65,8 +70,8 @@ func RegisterEtcdWatcher(target string, r DataReceiver, options ...ReaderOption)
 	if len(configOptions.path) == 0 {
 		return nil, errors.New("watching path must be provided")
 	}
-	if configOptions.valueType == nil {
-		return nil, errors.New("value type must be provided")
+	if configOptions.factory == nil {
+		return nil, errors.New("data type factory must be provided")
 	}
 
 	client, err := clientv3.New(clientv3.Config{
@@ -78,10 +83,10 @@ func RegisterEtcdWatcher(target string, r DataReceiver, options ...ReaderOption)
 	}
 
 	watcher := &configWatcher{
-		client:    client,
-		codec:     codec.NewJSONCodec(), // default using json codec
-		valueType: configOptions.valueType,
-		notifier:  r,
+		client:   client,
+		codec:    codec.NewJSONCodec(), // default using json codec
+		factory:  configOptions.factory,
+		receiver: r,
 	}
 	if configOptions.useMsgpackCodec {
 		watcher.codec = codec.NewMsgpackCodec()
@@ -95,8 +100,9 @@ func RegisterEtcdWatcher(target string, r DataReceiver, options ...ReaderOption)
 	if err == nil {
 		for i := range resp.Kvs {
 			if v := resp.Kvs[i].Value; v != nil {
-				if err := watcher.codec.Unmarshal(v, watcher.valueType); err == nil {
-					watcher.notifier(watcher.valueType)
+				data := watcher.factory.New()
+				if err := watcher.codec.Unmarshal(v, data); err == nil {
+					watcher.receiver(data)
 				}
 			}
 		}
@@ -111,8 +117,9 @@ func RegisterEtcdWatcher(target string, r DataReceiver, options ...ReaderOption)
 				for _, ev := range wresp.Events {
 					switch ev.Type {
 					case mvccpb.PUT:
-						if err := w.codec.Unmarshal(ev.Kv.Value, w.valueType); err == nil {
-							w.notifier(w.valueType)
+						data := watcher.factory.New()
+						if err := w.codec.Unmarshal(ev.Kv.Value, data); err == nil {
+							w.receiver(data)
 						}
 					}
 				}
