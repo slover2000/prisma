@@ -15,8 +15,6 @@ import (
 type configReaderOptions struct {
 	useMsgpackCodec bool
 	dialTimeout     time.Duration
-	path            string
-	factory         TypeFactory
 }
 
 type configWatcher struct {
@@ -33,33 +31,26 @@ type Watcher interface {
 }
 
 // TypeFactory define factory of data type
-type TypeFactory interface {
-	New() interface{}
-}
-
-// ReaderOption define options of config reader
-type ReaderOption func(*configReaderOptions)
+type TypeFactory func() interface{}
 
 // DataReceiver define interface method when a updating occur
 type DataReceiver func(data interface{})
 
+// ReaderOption define options of config reader
+type ReaderOption func(*configReaderOptions)
+
+// UsingMsgpackCodec enable msgpack codec
 func UsingMsgpackCodec() ReaderOption {
 	return func(c *configReaderOptions) { c.useMsgpackCodec = true }
 }
 
-func WithConfigPath(path string) ReaderOption {
-	return func(c *configReaderOptions) { c.path = path }
-}
-
+// WithDialTimeout define dial timeout of connecting to etcd server
 func WithDialTimeout(timeout time.Duration) ReaderOption {
 	return func(c *configReaderOptions) { c.dialTimeout = timeout }
 }
 
-func RegisterTypeFactory(factory TypeFactory) ReaderOption {
-	return func(c *configReaderOptions) { c.factory = factory }
-}
-
-func NewConfigWatcher(target string, r DataReceiver, options ...ReaderOption) (Watcher, error) {
+// NewConfigWatcher return a new instance of config watcher
+func NewConfigWatcher(target, path string, factory TypeFactory, r DataReceiver, options ...ReaderOption) (Watcher, error) {
 	configOptions := &configReaderOptions{
 		dialTimeout: 5 * time.Second,
 	}
@@ -67,10 +58,7 @@ func NewConfigWatcher(target string, r DataReceiver, options ...ReaderOption) (W
 		option(configOptions)
 	}
 
-	if len(configOptions.path) == 0 {
-		return nil, errors.New("watching path must be provided")
-	}
-	if configOptions.factory == nil {
+	if factory == nil {
 		return nil, errors.New("data type factory must be provided")
 	}
 
@@ -85,7 +73,7 @@ func NewConfigWatcher(target string, r DataReceiver, options ...ReaderOption) (W
 	watcher := &configWatcher{
 		client:   client,
 		codec:    codec.NewJSONCodec(), // default using json codec
-		factory:  configOptions.factory,
+		factory:  factory,
 		receiver: r,
 	}
 	if configOptions.useMsgpackCodec {
@@ -93,14 +81,13 @@ func NewConfigWatcher(target string, r DataReceiver, options ...ReaderOption) (W
 	}
 
 	// query config data from etcd
-	watchPath := configOptions.path
 	ctx, cancel := context.WithTimeout(context.Background(), configOptions.dialTimeout)
-	resp, err := watcher.client.Get(ctx, watchPath)
+	resp, err := watcher.client.Get(ctx, path)
 	cancel()
 	if err == nil {
 		for i := range resp.Kvs {
 			if v := resp.Kvs[i].Value; v != nil {
-				data := watcher.factory.New()
+				data := watcher.factory()
 				if err := watcher.codec.Unmarshal(v, data); err == nil {
 					watcher.receiver(data)
 				}
@@ -109,15 +96,15 @@ func NewConfigWatcher(target string, r DataReceiver, options ...ReaderOption) (W
 	}
 
 	// star go routine to watch
-	go func(w *configWatcher, path string) {
+	go func(w *configWatcher, watchPath string) {
 		// watch the path
 		for {
-			rch := w.client.Watch(context.Background(), path)
+			rch := w.client.Watch(context.Background(), watchPath)
 			for wresp := range rch {
 				for _, ev := range wresp.Events {
 					switch ev.Type {
 					case mvccpb.PUT:
-						data := watcher.factory.New()
+						data := watcher.factory()
 						if err := w.codec.Unmarshal(ev.Kv.Value, data); err == nil {
 							w.receiver(data)
 						}
@@ -128,7 +115,7 @@ func NewConfigWatcher(target string, r DataReceiver, options ...ReaderOption) (W
 				return
 			}
 		}
-	}(watcher, watchPath)
+	}(watcher, path)
 
 	return watcher, nil
 }
