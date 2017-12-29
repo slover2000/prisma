@@ -1,8 +1,8 @@
 package zipkin
 
 import (
-	"log"
 	"bytes"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -15,14 +15,14 @@ import (
 
 const (
 	// Default timeout for http request in seconds
-	defaultHTTPTimeout = time.Second * 5
+	defaultHTTPTimeout = time.Second * 3
 
 	// defaultBatchInterval in seconds
 	defaultHTTPBatchInterval = 1
 
 	defaultHTTPBatchSize = 100
 
-	defaultHTTPMaxBacklog = 1000	
+	defaultHTTPMaxBacklog = 1000
 )
 
 // HTTPCollector implements Collector by forwarding spans to a http server.
@@ -197,19 +197,19 @@ func (c *HTTPCollector) send() error {
 		c.url,
 		httpSerialize(sendBatch))
 	if err != nil {
-		log.Printf("err:%s", err.Error())
+		log.Printf("zipkin: send data err:%s", err.Error())
 		return err
 	}
 	req.Header.Set("Content-Type", "application/x-thrift")
 	resp, err := c.client.Do(req)
 	if err != nil {
-		log.Printf("err:%s", err.Error())
+		log.Printf("zipkin: send data err:%s", err.Error())
 		return err
 	}
 	resp.Body.Close()
 	// non 2xx code
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		log.Printf("HTTP POST span failed code:%s", resp.Status)
+		log.Printf("zipkin: HTTP POST span failed code:%s", resp.Status)
 	}
 
 	// Remove sent spans from the batch
