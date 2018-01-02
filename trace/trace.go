@@ -803,12 +803,12 @@ func spanHeader(traceID string, spanID uint64, options optionFlags) string {
 	return fmt.Sprintf("%s/%d;o=%d", traceID, spanID, options)
 }
 
-// SetHttpRootSpan generate a new root span and store into http header
-func SetHttpRootSpan(r *http.Request) {
+// EnsureHttpSpan generate a new root span if doesn't exist and store span into http header
+func EnsureHttpSpan(r *http.Request) {
 	headerInfo := r.Header.Get(httpTraceHeader)
 	if headerInfo == "" {
 		traceId := nextTraceID()
 		spanID := nextSpanID()
-		r.Header.Set(httpTraceHeader, fmt.Sprintf("%s/%d;o=%d", traceId, spanID, optionTrace))
+		r.Header.Set(httpTraceHeader, spanHeader(traceId, spanID, optionTrace))
 	}
 }
