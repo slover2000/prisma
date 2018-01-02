@@ -2,10 +2,13 @@ package hystrix
 
 import (
 	"sync"
-	"time"	
+	"time"
 )
 
 const (
+	// DefaultMaxQPS is how many commands of the same type can run at the same time
+	DefaultMaxQPS = 100
+
 	// DefaultVolumeThreshold is the minimum number of requests needed before a circuit can be tripped due to health
 	DefaultVolumeThreshold = 20
 
@@ -20,8 +23,8 @@ const (
 )
 
 // Settings hystrix settings
-type Settings struct {	
-	MaxQPS  			   int
+type Settings struct {
+	MaxQPS                 int
 	RequestVolumeThreshold int
 	SleepWindow            time.Duration
 	ErrorPercentThreshold  int
@@ -29,8 +32,8 @@ type Settings struct {
 }
 
 // CommandConfig is used to tune circuit settings at runtime
-type CommandConfig struct {	
-	MaxQPS  			   int `json:"max_qps"`
+type CommandConfig struct {
+	MaxQPS                 int `json:"max_qps"`
 	RequestVolumeThreshold int `json:"request_volume_threshold"`
 	SleepWindow            int `json:"sleep_window"`
 	ErrorPercentThreshold  int `json:"error_percent_threshold"`
@@ -45,7 +48,7 @@ func init() {
 
 // ConfigureCommand applies settings for a circuit
 func ConfigureCommand(name string, config CommandConfig) {
-	qps := 0
+	qps := DefaultMaxQPS
 	if config.MaxQPS != 0 {
 		qps = config.MaxQPS
 	}
@@ -68,7 +71,7 @@ func ConfigureCommand(name string, config CommandConfig) {
 	rollingWindows := DefaultRollingWindows
 	if config.RollingWindows != 0 {
 		rollingWindows = config.RollingWindows
-	}	
+	}
 
 	setting := &Settings{
 		MaxQPS:                 qps,
@@ -94,7 +97,7 @@ func getSettings(name string) *Settings {
 func GetCircuitSettings() map[string]*Settings {
 	copy := make(map[string]*Settings)
 
-	circuitSettings.Range(func (key, value interface{}) bool {
+	circuitSettings.Range(func(key, value interface{}) bool {
 		name, isName := key.(string)
 		setting, isSetting := key.(*Settings)
 		if isName && isSetting {
