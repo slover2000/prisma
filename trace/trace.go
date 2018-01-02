@@ -802,3 +802,13 @@ func (u withResponse) modifySpan(s *Span) {
 func spanHeader(traceID string, spanID uint64, options optionFlags) string {
 	return fmt.Sprintf("%s/%d;o=%d", traceID, spanID, options)
 }
+
+// SetHttpRootSpan generate a new root span and store into http header
+func SetHttpRootSpan(r *http.Request) {
+	headerInfo := r.Header.Get(httpTraceHeader)
+	if headerInfo == "" {
+		traceId := nextTraceID()
+		spanID := nextSpanID()
+		r.Header.Set(httpTraceHeader, fmt.Sprintf("%s/%d;o=%d", traceId, spanID, optionTrace))
+	}
+}
