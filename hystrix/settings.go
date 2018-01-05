@@ -7,7 +7,7 @@ import (
 
 const (
 	// DefaultMaxQPS is how many commands of the same type can run at the same time
-	DefaultMaxQPS = 100
+	DefaultMaxQPS = 200
 
 	// DefaultVolumeThreshold is the minimum number of requests needed before a circuit can be tripped due to health
 	DefaultVolumeThreshold = 20
