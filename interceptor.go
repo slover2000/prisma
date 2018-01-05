@@ -400,6 +400,16 @@ func (c *InterceptorClient) execute(ctx context.Context, run runFunc, fallback f
 	}
 }
 
+// Do wrapper method for standard interceptor client
+func Do(ctx context.Context, run runFunc) (interface{}, error) {
+	return StandardInterceptorClient().Do(ctx, run)
+}
+
+// DoWithFallback wrapper method for standard interceptor client
+func DoWithFallback(ctx context.Context, run runFunc, fallback fallbackFunc) (interface{}, error) {
+	return StandardInterceptorClient().DoWithFallback(ctx, run, fallback)
+}
+
 // Do runs your function in a synchronous manner, blocking until either your function succeeds
 // or an error is returned
 func (c *InterceptorClient) Do(ctx context.Context, run runFunc) (interface{}, error) {
