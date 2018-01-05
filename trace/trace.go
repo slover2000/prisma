@@ -809,6 +809,6 @@ func EnsureHttpSpan(r *http.Request) {
 	if headerInfo == "" {
 		traceId := nextTraceID()
 		spanID := nextSpanID()
-		r.Header.Set(httpTraceHeader, spanHeader(traceId, spanID, optionTrace))
+		r.Header.Set(httpTraceHeader, spanHeader(traceId, spanID, optionTrace))		
 	}
 }

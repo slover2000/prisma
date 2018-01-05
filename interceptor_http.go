@@ -2,8 +2,9 @@ package prisma
 
 import (
 	"fmt"
-	"time"
 	"net/http"
+	"regexp"
+	"time"
 
 	"github.com/slover2000/prisma/trace"
 )
@@ -12,8 +13,8 @@ import (
 //
 // Transport is safe for concurrent usage.
 type Transport struct {
-	Client 	*InterceptorClient
-	Base    http.RoundTripper
+	Client *InterceptorClient
+	Base   http.RoundTripper
 }
 
 // RoundTrip creates a trace.Span and inserts it into the outgoing request's headers.
@@ -37,12 +38,12 @@ func (t Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// do metrics
 	if t.Client != nil && t.Client.httpClientMetrics != nil {
 		t.Client.httpClientMetrics.CounterHTTP(req, time.Since(startTime), statusCode)
-	}	
+	}
 
 	// log request
 	if t.Client != nil && t.Client.log != nil {
 		msg := fmt.Sprintf("%s %s %s %d", req.Method, req.URL.String(), req.Proto, statusCode)
-		t.Client.log.LogHttpClientLine(req, startTime, statusCode, msg)	
+		t.Client.log.LogHttpClientLine(req, startTime, statusCode, msg)
 	}
 	return resp, err
 }
@@ -82,6 +83,23 @@ func (w *withStatusCodeResponseWriter) WriteHeader(code int) {
 	w.writer.WriteHeader(code)
 }
 
+// define http filter function
+type FilterFunc func(w http.ResponseWriter, r *http.Request) bool
+
+// define http handler options
+type httpFilterOptions struct {
+	filters map[string]FilterFunc
+}
+
+type HTTPFilterOption func(*httpFilterOptions)
+
+// UsingFilter config customer filter
+func UsingFilter(pattern string, filter FilterFunc) HTTPFilterOption {
+	return func(o *httpFilterOptions) {
+		o.filters[pattern] = filter
+	}
+}
+
 // HTTPHandler returns a http.Handler from the given handler
 // that is aware of the incoming request's span.
 // The span can be extracted from the incoming request in handler
@@ -90,23 +108,60 @@ func (w *withStatusCodeResponseWriter) WriteHeader(code int) {
 //    span := trace.FromContext(r.Context())
 //
 // The span will be auto finished by the handler.
-func (c *InterceptorClient) HTTPHandler(h http.Handler) http.Handler {
+func (c *InterceptorClient) HTTPHandler(h http.Handler, options ...HTTPFilterOption) http.Handler {
 	if c == nil {
 		return h
 	}
-	return &handler{client: c, handler: h}
+
+	o := &httpFilterOptions{
+		filters: make(map[string]FilterFunc),
+	}
+	for _, option := range options {
+		option(o)
+	}
+
+	filters := make([]*httpFilter, len(o.filters))
+	index := 0
+	for k, v := range o.filters {
+		f := &httpFilter{
+			pattern:    k,
+			filterFunc: v,
+			regexps:    regexp.MustCompile(k),
+		}
+		filters[index] = f
+		index += 1
+	}
+	return &httpHandler{client: c, handler: h, filters: filters}
 }
 
-type handler struct {
-	client 	*InterceptorClient
+type httpFilter struct {
+	pattern    string
+	regexps    *regexp.Regexp
+	filterFunc FilterFunc
+}
+
+type httpHandler struct {
+	client  *InterceptorClient
 	handler http.Handler
+	filters []*httpFilter
 }
 
-func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if len(h.filters) != 0 {
+		for _, filter := range h.filters {
+			if filter.regexps.MatchString(r.URL.Path) {
+				isContinue := filter.filterFunc(w, r)
+				if !isContinue {
+					return
+				}
+			}
+		}
+	}
+
 	var span *trace.Span
 	if h.client != nil && h.client.trace != nil {
 		span = h.client.trace.SpanFromRequestOrNot(r)
-	}	
+	}
 	defer span.Finish()
 
 	r = r.WithContext(trace.NewContext(r.Context(), span))
@@ -115,14 +170,14 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 	// TODO(jbd): Remove when there is a better way to report the client's sampling.
 	// 	w.Header().Set(httpTraceHeader, spanHeader(traceID, parentSpanID, span.trace.localOptions))
 	// }
-	
+
 	rw := &withStatusCodeResponseWriter{writer: w}
 	startTime := time.Now()
 	h.handler.ServeHTTP(rw, r)
 
 	if rw.statusCode == 0 {
 		rw.statusCode = http.StatusOK
-	}	
+	}
 
 	// do metrics
 	if h.client != nil && h.client.httpServerMetrics != nil {
