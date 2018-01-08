@@ -134,6 +134,14 @@ func (c *InterceptorClient) HTTPHandler(h http.Handler, options ...HTTPFilterOpt
 	return &httpHandler{client: c, handler: h, filters: filters}
 }
 
+func (c *InterceptorClient) BeegoMiddleware(h http.Handler) http.Handler {
+	if c == nil {
+		return h
+	}
+
+	return &httpHandler{client: c, handler: h, filters: make([]*httpFilter, 0)}
+}
+
 type httpFilter struct {
 	pattern    string
 	regexps    *regexp.Regexp
