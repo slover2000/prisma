@@ -6,7 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/context"
 	"golang.org/x/time/rate"
+	"github.com/slover2000/prisma/pool"
 )
 
 type StatusType = int32
@@ -24,6 +26,7 @@ type CircuitBreaker struct {
 	forceOpen      bool
 	openedTime 	   int64
 	metrics        MetricCollector
+	pool           *pool.GoPool
 	limiter        *rate.Limiter
 }
 
@@ -41,19 +44,52 @@ func GetCircuit(name string) *CircuitBreaker {
 	return circuit
 }
 
+func stopAllCircuit(timeout int) {
+	circuitBreakers.Range(func(key, value interface{}) bool {
+		circuit := value.(*CircuitBreaker)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout) * time.Second)
+		defer cancel()
+		circuit.pool.Stop(ctx)
+		return true
+	})
+}
+
 // newCircuitBreaker creates a CircuitBreaker with associated Health
 func newCircuitBreaker(name string) *CircuitBreaker {
 	config := getSettings(name)
 	c := &CircuitBreaker{
 		name: name,
 		status: Closed,
+		pool: pool.NewGoPool(config.MaxConcurrent, config.MaxConcurrent),
 		metrics: newMetricCollector(name, config.RollingWindows),
 	}
 	if config.MaxQPS > 0 {
 		c.limiter = rate.NewLimiter(rate.Limit(config.MaxQPS), 1 + config.MaxQPS)
 	}
-
+	c.pool.Start()
 	return c
+}
+
+func (circuit *CircuitBreaker) Excute(ctx context.Context, run runFunc, fallback fallbackFunc) *actionResult {
+	c := make(chan *pool.Result)
+	ok := circuit.pool.Submit(&pool.Task{
+		Callable: run, 
+		ResultChan: c,
+	})
+	if !ok {
+		if fallback != nil {
+			value, err := fallback(errCircuitReject)
+			return &actionResult{value: value, err: err}
+		}
+		return &actionResult{err: errCircuitReject}
+	} else {
+		select {
+		case result := <-c:
+			return &actionResult{value: result.Value, err: result.Err}
+		case <-ctx.Done():
+			return &actionResult{err: errCircuitTimeout}
+		}
+	}
 }
 
 // toggleForceOpen allows manually causing the fallback logic for all instances

@@ -30,8 +30,8 @@ type (
 	fixedWorkerPool struct {
 		lock         	sync.Mutex
 		workersCount	int
-		ready					[]*workerChan
-		stopCh 				chan struct{}
+		ready           []*workerChan
+		stopCh          chan struct{}
 	}
 )
 
@@ -65,6 +65,11 @@ func NewFixedWorkerPool(num int, block bool) Executor {
 
 // Execute fixed worker pool execute implementation
 func (wp *fixedWorkerPool) Execute(job Job) bool {
+	if wp.IsStopped() {
+		fmt.Println("go worker stopped.")
+		return false
+	}
+
 	hashCode := uint32(0)
 	key := job.Key()
 	if len(key) > 0 {
@@ -90,6 +95,10 @@ func (wp *fixedWorkerPool) Execute(job Job) bool {
 
 	ch.ch <- job
 	return true
+}
+
+func (wp *fixedWorkerPool) IsStopped() bool {
+	return wp.stopCh == nil
 }
 
 // Stop stop the fixed worker pool

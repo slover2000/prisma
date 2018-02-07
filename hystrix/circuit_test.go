@@ -1,9 +1,11 @@
 package hystrix
 
-import (
+import (	
+	"fmt"
 	"time"
-	"sync"
+	"sync"	
 	"testing"
+	"golang.org/x/net/context"
 )
 
 func TestGetCircuit(t *testing.T) {
@@ -173,4 +175,35 @@ func TestCircuitErrorStatusWithFinalFailed(t *testing.T) {
 		}()	
 	}
 	wg2.Wait()
+}
+
+func TestCircuitExecute(t *testing.T) {
+	ConfigureCommand("command", CommandConfig{MaxConcurrent:5, MaxQPS: 1000, RequestVolumeThreshold: 100, SleepWindow: 15, RollingWindows: 20, ErrorPercentThreshold: 30})
+	runFunc := func() (interface{}, error) {
+		time.Sleep(10 * time.Millisecond)
+		return "ok", nil
+	}
+	fbFunc := func(err error) (interface{}, error) {
+		return nil, err
+	}
+
+	succ := 0
+	failed := 0
+	for i := 0; i < 100; i++ {
+		time.Sleep(1 * time.Millisecond)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(3) * time.Second)
+			_, e := Execute(ctx, "command", runFunc, fbFunc)
+			cancel()
+			if e != nil {
+				failed++
+				fmt.Printf("TestCircuitExecute get error: %v\n", e)
+			} else {
+				succ++
+			}
+		}()
+	}
+	time.Sleep(10 * time.Second)
+	stopAllCircuit(3)
+	fmt.Printf("task succ[%d] failed[%d]\n", succ, failed)
 }

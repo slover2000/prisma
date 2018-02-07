@@ -20,6 +20,8 @@ type actionResult struct{
 }
 
 var errCircuitOpen error
+var errCircuitReject error
+var errCircuitTimeout error
 
 type runFunc = func() (interface{}, error)
 type fallbackFunc = func(error) (interface{}, error)
@@ -28,6 +30,8 @@ type hystrixKey struct{}
 
 func init() {
 	errCircuitOpen = errors.New("circuit open")
+	errCircuitReject = errors.New("circuit reject")
+	errCircuitTimeout = errors.New("circuit timeout")
 }
 
 func WithGroup(ctx context.Context, name string) context.Context {
@@ -44,43 +48,29 @@ func GetHystrixCommand(ctx context.Context) (string, bool) {
 	return "", false
 }
 
+func StopHystrix(timeout int) {
+	stopAllCircuit(timeout)
+}
+
 // Execute runs your function in a synchronous manner, blocking until either your function succeeds
 // or an error is returned, including hystrix circuit errors
 func Execute(ctx context.Context, name string, run runFunc, fallback fallbackFunc) (interface{}, error) {
-	done := make(chan actionResult, 1)
 	eventType := successTypeError
 	circuit := GetCircuit(name)
-	go func() {
-		var result actionResult		
-		if circuit.AttemptExecution() {
-			value, err := run()
-			result.value = value
-			result.err = err
-			if err != nil {
-				eventType = failureTypeError
-			}
-		} else {
-			if fallback != nil {
-				value, err := fallback(errCircuitOpen)
-				result.value = value
-				result.err = err
-			} else {
-				result.err = errCircuitOpen
-			}
-			eventType = circuitTypeError
-		}
-		done <- result
-	}()
 	defer circuit.ReportEvent(eventType)
-
-	select {
-	case result, _ := <-done:
-		return result.value, result.err
-	case <-ctx.Done():
-		eventType = timeoutTypeError
-		if fallback != nil {
-			return fallback(ctx.Err())
+	
+	if circuit.AttemptExecution() {
+		result := circuit.Excute(ctx, run, fallback)
+		if result.err != nil {
+			eventType = failureTypeError
 		}
-		return nil, ctx.Err()
+		return result.value, result.err
+	} else {
+		eventType = circuitTypeError
+		if fallback != nil {
+			return fallback(errCircuitOpen)
+		} else {
+			return nil, errCircuitOpen
+		}		
 	}
 }

@@ -6,6 +6,9 @@ import (
 )
 
 const (
+	// DefaultConcurrentValue is how many goroutines can be run at the same time
+	DefaultConcurrentValue = 20	
+
 	// DefaultMaxQPS is how many commands of the same type can run at the same time
 	DefaultMaxQPS = 200
 
@@ -24,6 +27,7 @@ const (
 
 // Settings hystrix settings
 type Settings struct {
+	MaxConcurrent          int
 	MaxQPS                 int
 	RequestVolumeThreshold int
 	SleepWindow            time.Duration
@@ -33,6 +37,7 @@ type Settings struct {
 
 // CommandConfig is used to tune circuit settings at runtime
 type CommandConfig struct {
+	MaxConcurrent          int `json:"max_concurrent"`
 	MaxQPS                 int `json:"max_qps"`
 	RequestVolumeThreshold int `json:"request_volume_threshold"`
 	SleepWindow            int `json:"sleep_window"`
@@ -51,6 +56,11 @@ func ConfigureCommand(name string, config CommandConfig) {
 	qps := DefaultMaxQPS
 	if config.MaxQPS != 0 {
 		qps = config.MaxQPS
+	}
+
+	concurrent := DefaultConcurrentValue
+	if config.MaxConcurrent != 0 {
+		concurrent = config.MaxConcurrent
 	}
 
 	volume := DefaultVolumeThreshold
@@ -74,6 +84,7 @@ func ConfigureCommand(name string, config CommandConfig) {
 	}
 
 	setting := &Settings{
+		MaxConcurrent:          concurrent,
 		MaxQPS:                 qps,
 		RequestVolumeThreshold: volume,
 		SleepWindow:            time.Duration(sleep) * time.Millisecond,

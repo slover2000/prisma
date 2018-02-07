@@ -1,8 +1,6 @@
 package pool
 
 import (
-	"sync"
-	"runtime"
 )
 
 type (

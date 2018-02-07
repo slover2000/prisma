@@ -3,7 +3,6 @@ package pool
 import (	
 	"log"
 	"time"
-	"runtime"
 	"hash/fnv"
 	"math/rand"	
 	"container/heap"
@@ -141,7 +140,6 @@ func (sp *scheduleWorkerPool) submit(job Job) {
 	} else {
 		idx = rand.Intn(len(sp.ready))
 	}
-	log.Printf("select worker: %d", idx)
 	ch := sp.ready[idx]
 	ch.ch <- job
 }
