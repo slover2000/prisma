@@ -48,6 +48,12 @@ func GetHystrixCommand(ctx context.Context) (string, bool) {
 	return "", false
 }
 
+func InitHystrix(configs map[string]CommandConfig) {
+	for k, v := range configs {
+		ConfigureCommand(k, v)
+	}
+}
+
 func StopHystrix(timeout int) {
 	stopAllCircuit(timeout)
 }
