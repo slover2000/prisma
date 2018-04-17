@@ -379,7 +379,6 @@ func (c *InterceptorClient) execute(ctx context.Context, run runFunc, fallback f
 		return hystrix.Execute(ctx, name, run, fallback)
 	}
 
-	// disable hystrix module
 	done := make(chan actionResult, 1)
 	go func() {
 		result, err := run()
@@ -388,15 +387,17 @@ func (c *InterceptorClient) execute(ctx context.Context, run runFunc, fallback f
 		} else {			
 			fallbackResult, fallbackErr := fallback(err)
 			done <- actionResult{value: fallbackResult, err: fallbackErr}		
-		}		
+		}
 	}()
 	
 	select {
 	case result, _ := <-done:
 		return result.value, result.err
 	case <-ctx.Done():
-		fallbackResult, fallbackErr := fallback(ctx.Err())
-		return fallbackResult, fallbackErr
+		if fallback != nil {
+			return fallback(ctx.Err())
+		}
+		return nil, ctx.Err()
 	}
 }
 

@@ -236,7 +236,6 @@ func loglevelToLogusLevel(lvl LogLevel) logrus.Level {
 	}
 }
 
-// grpcCodeToLogrusLevel is the default implementation of gRPC return codes to log levels for server side.
 func grpcCodeToLogrusLevel(code codes.Code) logrus.Level {
 	switch code {
 	case codes.OK:
