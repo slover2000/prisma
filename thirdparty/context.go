@@ -67,35 +67,17 @@ func DetectContextValue(ctx context.Context) SystemType {
 }
 
 // JoinDatabaseContextValue returns a derived context containing the mongo values.
-func JoinDatabaseContextValue(ctx context.Context, system, db, table, action, sql string) context.Context {
-	param := &DatabaseParam{
-		System: system,
-		Database: db,
-		Table: table,
-		Action: action,
-		SQL: sql,
-	}
+func JoinDatabaseContextValue(ctx context.Context, param DatabaseParam) context.Context {
 	return context.WithValue(ctx, interceptorKey{}, param)
 }
 
 // JoinCacheContextValue returns a derived context containing the mongo values.
-func JoinCacheContextValue(ctx context.Context, system, action, command string) context.Context {
-	param := &CacheParam{
-		System: system,
-		Action: action,
-		Command: command,
-	}
+func JoinCacheContextValue(ctx context.Context, param CacheParam) context.Context {
 	return context.WithValue(ctx, interceptorKey{}, param)
 }
 
 // JoinSearchContextValue returns a derived context containing the mongo values.
-func JoinSearchContextValue(ctx context.Context, system, index, action, command string) context.Context {
-	param := &SearchParam{
-		System: system,
-		Index: index,
-		Action: action,
-		Command: command,
-	}
+func JoinSearchContextValue(ctx context.Context, param SearchParam) context.Context {
 	return context.WithValue(ctx, interceptorKey{}, param)
 }
 
